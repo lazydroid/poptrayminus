@@ -3,7 +3,7 @@ Section: python
 Priority: optional
 Maintainer: lenik, <lenik@lazydroid.com>
 Build-Depends: debhelper (>= 7),
-               python-qt4,
+               python-qt4, python-chardet,
                python (>= 2.6.6-3~)
 Standards-Version: 3.9.2
 X-Python-Version: >= 2.6

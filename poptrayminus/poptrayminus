@@ -17,12 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# $Id: poptray.py 102 2009-04-01 01:21:11Z lenik $
+# $Id: poptray.py 118 2009-04-09 10:58:03Z lenik $
 
-import poplib,  email, base64, codecs
-import os, sys, datetime, socket
+import poplib,  email, base64, codecs, types
+import os, sys, datetime, socket, chardet
 
-__version__ = "0.5.0"
+__version__ = "0.6.0"
 
 ICONS = {}
 PIXMAPS = {}
@@ -90,94 +90,55 @@ class sysTray(QtGui.QWidget):
 #		print 'about!'
 		BrowserForm(self, "PopTray Minus - About",
 u"""
-<h2>PopTray Minus v0.50</h2>
+<h2>PopTray Minus v0.60</h2>
 <h4>Copyright (c) 2009 lenik terenin</h4>
-<p>This document explains the basic functions and limitations of
-PopTray Minus software as well as provides an information about the
-future development plans.
 
-<h4>History</h4>
-<p>I've started this project after moving to Linux. I tried to find
-a good replacement for a very convenient windows tool -- Poptray.
-Unfortunately, there was no linux-based alternative at the moment,
-so I had to roll my own. I did not plan to add any new features, but
-ony implement a useful subset of what we had in PopTray. Hence the
-name -- PopTray Minus.
+<p>If you're looking at this text, you have already figured out how
+to right-click a context menu from the icon in the tray =)
 
-<h4>Main Features</h4>
-<p>According to my original plans PopTray Minus should:
+<h4>Other not very obvious things I'd like to tell you about are</h4>
 
-<ul>
-<li>live happily in the tray
-<li>regularly check message headers in my POP3 mailbox
-<li>apply basic filters based on from/to/subj contents
-<li>allow a sneak peek to preview the message body
-<li>feature a delete function to manually remove unwanted messages
-</ul>
+<p>Hold the mouse pointer over the tray icon to get status tooltip,
+which tells if mailbox is being read or overall statistics otherwise.
 
-<p>Tray life is easy with PyQt4. Left click brings up the main window with
-the message list. Another left click on the icon hides it back. PopTray Minus
-does not stop running even when the main window is gone. You have to right
-click on the icon and select "Quit" in the menu if you really want to quit. Main
-window (as well as all other windows) can also be dismissed with Esc key or
+<p>If you change account information or add/delete accounts while PopTray
+Minus is reading your mailboxes, new settings will be applied and tabs for
+new/deleted accounts in the main window will appear or disappear as soon
+as mailbox is closed. And if there were any changes, the corresponding
+mailbox will be reloaded again.
+
+<p>Left click on the tray icon brings up the main window with the message
+list. Another left click on the icon hides it back. PopTray Minus does not stop
+running even when the main window is gone. You have to right click on the
+icon and select "Quit" in the menu if you really want to quit. Main window
+(as well as all other windows) can also be dismissed with Esc key or
 click on the close icon in the window corner.
-
-<p>Mailbox is open every NN minutes (can be changed in Settings, default: 15),
-message headers are retrieved, blacklisted messages are removed and mailbox is closed
-again. Countdown timer until the next mailbox rescan is reset only when the box is
-already closed to avoid dealing with short rescan intervals and large mailboxes.
 
 <p>Current filter system only supports substring search within from/to/subj
 fields of the message header. Please, be careful, searching for a single letter
 may easily kill all you mail. It's a good idea to include as much as possible in
-the search pattern to avoid dangerous mistakes.
+the search pattern to avoid dangerous mistakes. Actually, PopTray Minus will
+complain if you blacklisting pattern is too short.
 
 <p>Preview/Delete works only is server supports UIDL. Only one message can
 be previewed (button grays out if several messages are selected), though
 Delete can kill many messages at once. Preview does not download the whole
 message (in case you've got a multimegabyte file attach), but only first NN
-lines (configurable, default: 20)
+lines (default: 20, does anyone really need this to be changed?)
 
 <p>"Score" column shows Spamassassin score if it's configured on your server.
 Positive scores are shown in red and negative scores are shown in green.
 
-<h4>Requrements</h4>
-
-There are only three requirements to use PopTray Minus:
-
-<ul>
-<li>Python and PyQt4 (required)
-<li>KDE or GNOME (recommended)
-<li>UIDL support on POP3 server (recommended)
-</ul>
-
-<p>PopTray Minus is written in Python using PyQt4 GUI libraries, so these
-two things are required. Fortunately, Python is already installed and PyQt4
-is available for installation on most contemporary linux distributions. If you
-use Windows or Mac OS X your mileage may vary.
-
-<p>Main idea is to hide in the tray, so we need a good X11 based GUI
-manager that implements the freedesktop.org system tray specification
-(recent versions of KDE and GNOME). According to the PyQt4 manuals
-Windows and Mac OS X may also be supported but I haven't checked it yet.
-
-<p>POP3 server with UIDL support is almost required. UIDL is important
-because it allows us to track messages between POP3 sessions while
-other programs may access and/or modify the mailbox contents. If your
-server lacks UIDL, you won't be able to preview/delete messages, however
-message list and basic from/to/subj filters should work just fine.
-
 <h4>Things to be added later (maybe)</h4>
 
 <ul>
-<li>multi-account support
 <li>multiprotocol support (POP3SSL, IMAP)
 <li>complicated filter rule system to confuse newcomers
 </ul>
 
 Personally I use one simple POP3 account only, so chances are multiprotocol
-and multi-accoint support might not be the highest priority. On the other hand,
-writing large regexps is fun enough to try.
+support might not be the highest priority. On the other hand, writing large
+regexps is fun enough to try.
 
 <h4>Things that most probably won't be added</h4>
 
@@ -187,8 +148,7 @@ writing large regexps is fun enough to try.
 </ul>
 
 Dealing with e-mail software in a cross-platform compatible way is a major
-problem, that's why I don't even want to touch this. After all, I hope someday
-PopTray Minus will work not only on Linux.
+<s>pain in the..</s> problem, that's why I don't even want to touch this.
 
 <h4>Updates</h4>
 <p>
@@ -198,6 +158,17 @@ You can find the latest versions of this software at:
 <li><a href="http://server-pro.com/poptrayminus/">PopTray Minus Home</a>
 </ul>
 
+<p>and you may reach the author at <a href="mailto:lenik@server-pro.com">
+lenik@server-pro.com</a>
+
+<h4>Thanks</h4>
+
+<p>Thank your for using PopTray Minus! Also I woudl like to thank
+the original creator of PopTray &mdash; Renier Crause, who gave
+me the idea, Trolltech for Qt toolkit, Phil Thompson for PyQt
+bindings, Guido van Rossum for Python and Mark Summerfield for
+his book and code snippets.
+
 <p>Press <b>Esc</b> to close this window.
 """
 		).show()
@@ -205,7 +176,7 @@ You can find the latest versions of this software at:
 class SortedTreeWidgetItem( QtGui.QTreeWidgetItem ) :
 
 	def __lt__( self, other ) :
-		if not form.table.sortColumn() :
+		if not self.treeWidget().sortColumn() :
 			try :
 				return float(self.text(0)) < float(other.text(0))
 			except:
@@ -215,12 +186,9 @@ class SortedTreeWidgetItem( QtGui.QTreeWidgetItem ) :
 	def __ge__( self, other ) :
 		raise 'holy shit'
 
-class ConfigForm( QtGui.QDialog ) :
+class ConfigPage( QtGui.QWidget ) :
 	def __init__( self, parent = None ) :
-		super( ConfigForm, self ).__init__( parent )
-
-		self.setWindowTitle( 'PopTray Minus - Settings' )
-		self.resize( 340, 540 )
+		super( ConfigPage, self ).__init__( parent )
 
 		# server parms
 		form_layout = QtGui.QFormLayout()
@@ -254,31 +222,24 @@ class ConfigForm( QtGui.QDialog ) :
 		black_to_layout.addWidget( QtGui.QLabel( 'Blacklist if "To" contains (one line - one pattern):', self ) )
 		black_to_layout.addWidget( self.black_to )
 
-		button_box = QtGui.QDialogButtonBox( QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel )
-		button_box.button( QtGui.QDialogButtonBox.Ok ).setDefault(True)
-
-		# overall layout
+		# page layout
 		layout = QtGui.QVBoxLayout( self )
 		layout.addLayout( form_layout )
 		layout.addLayout( black_from_layout )
 		layout.addLayout( black_to_layout )
-		layout.addWidget( button_box )
-
-		self.connect( button_box, QtCore.SIGNAL("accepted()"), self, QtCore.SLOT("accept()"))
-		self.connect( button_box, QtCore.SIGNAL("rejected()"), self, QtCore.SLOT("reject()"))
 
 		self.mailbox_combo.addItem( getIcon('internet.png'), 'POP3' )
 
-		interval = int(settings.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
+		interval = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
 		for i,v in enumerate( ( 5, 10, 15, 20, 30, 40, 60 ) ) :
 			self.interval_combo.addItem( '%d min' % v )
 			if interval >= v :
 				self.interval_combo.setCurrentIndex( i )
 		self.interval_combo.setEditable( False )
 
-		self.server_edit.setText( str(settings.value( 'host' ).toString()) )
-		self.user_edit.setText( str(settings.value( 'user' ).toString()) )
-		self.pass_edit.setText( str(settings.value( 'pass' ).toString()) )
+		self.server_edit.setText( str(config.value( 'host' ).toString()) )
+		self.user_edit.setText( str(config.value( 'user' ).toString()) )
+		self.pass_edit.setText( str(config.value( 'pass' ).toString()) )
 
 		self.black_from.setPlainText( '\n'.join( loadConfigList( 'black_from_contains' ) ) )
 		self.black_to.setPlainText( '\n'.join( loadConfigList( 'black_to_contains' ) ) )
@@ -289,53 +250,143 @@ class ConfigForm( QtGui.QDialog ) :
 	def extract_patterns( self, edit, name ) :
 		pats = str( edit.toPlainText() ).split( '\n' )
 		pats = list( i for i in pats if len(i) )
-		bad = list( i for i in pats if len(i) < 4 )
-		if len(bad) :
-			raise Exception, 'Black "%s" patterns are too short,\nsupposed to be at least 5 characters long:\n%s' % (name, str(bad))
+		too_short = list( i for i in pats if len(i) < 4 )
+		if len(too_short) :
+			raise Exception, 'Blacklisted "%s" patterns are too short,\nsupposed to be at least 5 characters long:\n%s' % (name, str(too_short))
 
 		return pats
 
-	def accept( self ) :
+	def validate_data( self ) :
 		host = str(self.server_edit.text())
 		user = str(self.user_edit.text())
 		passwd = str(self.pass_edit.text())
 		try :
 			socket.gethostbyname( host )
 		except Exception, (errno, errmsg) :
-			QtGui.QMessageBox.warning( self, 'Error', host + ' -- ' + errmsg )
-			return
+			raise Exception, host + ' -- ' + errmsg
 
-		try :
-			bf = self.extract_patterns( self.black_from, 'From' )
-			bt = self.extract_patterns( self. black_to, 'To' )
-		except Exception, e :
-			QtGui.QMessageBox.warning( self, 'Error', str(e) )
-			return
+		bf = self.extract_patterns( self.black_from, 'From' )
+		bt = self.extract_patterns( self. black_to, 'To' )
 
 		for i,v in (( host, 'Server address'), ( user, 'User name' ) ) :
 			if not len(i) :
-				QtGui.QMessageBox.warning( self, 'Error', '%s can not be empty' % v )
-				return
+				raise Exception, '%s can not be empty' % v
 
+	def save_data( self ) :
+		host = str(self.server_edit.text())
+		user = str(self.user_edit.text())
+		passwd = str(self.pass_edit.text())
 		interval = int( str( self.interval_combo.currentText() ).split()[0] )
 
-		settings.setValue( 'host', QtCore.QVariant( host ) )
-		settings.setValue( 'user', QtCore.QVariant( user ) )
-		settings.setValue( 'pass', QtCore.QVariant( passwd ) )
-		settings.setValue( 'interval', QtCore.QVariant( interval ) )
+		config.setValue( 'host', QtCore.QVariant( host ) )
+		config.setValue( 'user', QtCore.QVariant( user ) )
+		config.setValue( 'pass', QtCore.QVariant( passwd ) )
+		config.setValue( 'interval', QtCore.QVariant( interval ) )
+
+		bf = self.extract_patterns( self.black_from, 'From' )
+		bt = self.extract_patterns( self. black_to, 'To' )
 
 		saveConfigList( 'black_from_contains', bf )
 		saveConfigList( 'black_to_contains', bt )
 
-		settings.sync()
+	def title( self ) :
+		if not self.server_edit.text() :
+			return '<empty>'
+		return '%s@%s' % (self.user_edit.text(), self.server_edit.text())
+
+class ConfigForm( QtGui.QDialog ) :
+	def __init__( self, parent = None ) :
+		super( ConfigForm, self ).__init__( parent )
+
+		self.setWindowTitle( 'PopTray Minus - Settings' )
+		self.resize( 400, 540 )
+
+		plus_button = QtGui.QPushButton( getIcon( 'plus.png' ), '' )
+		self.minus_button = QtGui.QPushButton( getIcon( 'minus.png' ), '' )
+		button_box = QtGui.QDialogButtonBox( QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel )
+		button_box.button( QtGui.QDialogButtonBox.Ok ).setDefault(True)
+
+		buttons_layout = QtGui.QHBoxLayout()
+		buttons_layout.addWidget( plus_button )
+		buttons_layout.addWidget( self.minus_button )
+		buttons_layout.addStretch()
+		buttons_layout.addWidget( button_box )
+
+		self.tab_widget = QtGui.QTabWidget()
+		self.pages = list()
+
+		for i in range( len(config.childGroups()) ) :
+			config.beginGroup( 'account%d' % i )
+			if config.contains( 'host' ) or not i :
+				page = ConfigPage()
+				self.tab_widget.addTab( page, page.title() )
+				self.pages.append( page )
+			config.endGroup()
+
+		# overall layout
+		layout = QtGui.QVBoxLayout( self )
+		layout.addWidget( self.tab_widget )
+		layout.addLayout( buttons_layout )
+
+		self.connect( button_box, QtCore.SIGNAL("accepted()"), self, QtCore.SLOT("accept()"))
+		self.connect( button_box, QtCore.SIGNAL("rejected()"), self, QtCore.SLOT("reject()"))
+
+		self.connect( plus_button, QtCore.SIGNAL('clicked()'), self.addAccount )
+		self.connect( self.minus_button, QtCore.SIGNAL('clicked()'), self.deleteAccount )
+
+	def addAccount( self ) :
+		page = ConfigPage()
+		self.tab_widget.addTab( page, page.title() )
+		self.tab_widget.setCurrentWidget( page )
+		self.pages.append( page )
+		self.minus_button.setEnabled( len( self.pages ) > 1 )
+
+	def deleteAccount( self ) :
+		if self.tab_widget.count() > 1 :
+			index = self.tab_widget.currentIndex()
+			self.tab_widget.removeTab( index )
+			self.pages.remove( self.pages[index] )
+		self.minus_button.setEnabled( len( self.pages ) > 1 )
+
+	def accept( self ) :
+		count = self.tab_widget.count()
+		for i in range(count) :
+			page = self.tab_widget.widget( i )
+			try :
+				page.validate_data()
+			except Exception, e :
+				self.tab_widget.setCurrentWidget( page )
+				QtGui.QMessageBox.warning( self, 'Error', str(e) )
+				return
+
+		for i in range(count) :
+			config.beginGroup( 'account%d' % i )
+			page = self.tab_widget.widget( i )
+			page.save_data()
+			config.endGroup()
+
+		# deal with leftover account data in config
+		for i in range(count,len(config.childGroups())) :
+			config.beginGroup( 'account%d' % i )
+			config.remove('')	# clean up everything
+			config.endGroup()
+
+		config.sync()
+
+		form.timer.setInterval( 1000 )	# 1 sec to form.reload
 
 		QtGui.QDialog.accept(self)
 
 class MainForm( QtGui.QDialog ) :
-
 	def __init__( self, parent = None ) :
 		super( MainForm, self ).__init__( parent )
-		self.table = QtGui.QTreeWidget()
+
+		self.tables = list()
+		self.mailboxen = list()
+		self.tab_widget = QtGui.QTabWidget()
+
+		self.setup_tabs()
+		self.setup_boxes()
 
 		self.reload_button = QtGui.QPushButton( 'reload', self )
 		self.reload_button.setIcon( getIcon( 'reload.png' ) )
@@ -349,7 +400,7 @@ class MainForm( QtGui.QDialog ) :
 		button_layout.addStretch()
 		button_layout.addWidget( self.reload_button )
 		layout = QtGui.QVBoxLayout()
-		layout.addWidget( self.table )
+		layout.addWidget( self.tab_widget )
 		layout.addLayout( button_layout )
 		self.setLayout( layout )
 
@@ -357,10 +408,11 @@ class MainForm( QtGui.QDialog ) :
 		self.connect( self.delete_button, QtCore.SIGNAL( 'clicked()' ), self.onDelete )
 		self.connect( self.reload_button, QtCore.SIGNAL( 'clicked()' ), self.onReload )
 
-		self.connect( self.table, QtCore.SIGNAL( 'itemSelectionChanged()' ), self.onSelectionChange )
+		self.connect( self.tab_widget, QtCore.SIGNAL( 'currentChanged(int)' ), self.tabChanged )
+#		self.connect( self.table, QtCore.SIGNAL( 'itemSelectionChanged()' ), self.onSelectionChange )
 
-		self.table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
-		self.connect( self.table, QtCore.SIGNAL('customContextMenuRequested(QPoint)'), self.onContext)
+#		self.table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
+#		self.connect( self.table, QtCore.SIGNAL('customContextMenuRequested(QPoint)'), self.onContext)
 
 		self.setWindowTitle( 'PopTray Minus' )
 		geometry = QtGui.QApplication.desktop().availableGeometry()
@@ -369,23 +421,70 @@ class MainForm( QtGui.QDialog ) :
 		self.resize( width, height )
 #		print width, height
 
-		headers = [ 'Score', 'From', 'To', 'Date', 'Subject' ]
-		self.table.setHeaderLabels( headers )
-
-#		self.table.setSortingEnabled(False)
-#		self.table.setColumnWidth( 0, 70 )
-		self.table.addTopLevelItem( QtGui.QTreeWidgetItem(
-				[ '-20.0', 'werwer', 'asdasdads', '2009-00-00 00:00:00' ] ) )
-		self.table.resizeColumnToContents( 0 )
-		self.table.resizeColumnToContents( 3 )
-		self.table.clear()
-
-		self.table.setColumnWidth( 1, self.size().width()/4 )
-		self.table.setColumnWidth( 2, self.size().width()/4 )
-		self.table.setAlternatingRowColors(True)
-#		self.table.setSelectionBehavior( QTreeWidget.SelectRows )
-		self.table.setSelectionMode( QtGui.QTreeWidget.ExtendedSelection )
 		self.onSelectionChange()
+
+		self.timer = QtCore.QTimer()
+		self.connect( self.timer, QtCore.SIGNAL( 'timeout()'), self.auto_reload )
+		self.timer.setInterval( 1000 )	# 1 sec
+		self.timer.setSingleShot( True )
+		self.timer.start()
+
+	def tabChanged( self ) :
+#		print 'changed'
+		self.refresh()
+
+	def setup_boxes( self ) :
+		boxes = list()
+		boxnum = dict( (str(b.account),n) for n,b in enumerate(self.mailboxen) )
+#		print boxnum
+
+		load_settings()
+
+		for acc in settings :
+			try :
+				num = boxnum[str(acc)]
+				boxes.append( self.mailboxen[num] )
+			except KeyError :
+				boxes.append( Mailbox( acc ) )
+
+		self.mailboxen = boxes
+
+	def setup_tabs( self ) :
+		load_settings()
+		headers = [ 'Score', 'From', 'To', 'Date', 'Subject' ]
+		for i,acc in enumerate(settings) :
+			host = acc['host']
+			user = acc['user']
+			title = '%s@%s' % (user,host)
+			if i < len(self.tables) :
+				self.tab_widget.setTabText( i, title )
+			else :
+				table = QtGui.QTreeWidget()
+				self.tab_widget.addTab( table, title )
+				self.tables.append( table )
+
+				self.connect( table, QtCore.SIGNAL( 'itemSelectionChanged()' ), self.onSelectionChange )
+
+				table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
+				self.connect( table, QtCore.SIGNAL('customContextMenuRequested(QPoint)'), self.onContext)
+
+				table.setHeaderLabels( headers )
+
+				table.addTopLevelItem( QtGui.QTreeWidgetItem(
+						[ '-20.0', 'werwer', 'asdasdads', '2009-00-00 00:00:00' ] ) )
+				table.resizeColumnToContents( 0 )
+				table.resizeColumnToContents( 3 )
+				table.clear()
+
+				table.setColumnWidth( 1, self.size().width()/4 )
+				table.setColumnWidth( 2, self.size().width()/4 )
+				table.setAlternatingRowColors(True)
+				table.setSelectionMode( QtGui.QTreeWidget.ExtendedSelection )
+				table.setSortingEnabled(True)
+
+		for i in range(len(settings),len(self.tables)) :
+			self.tables.pop()
+			self.tab_widget.removeTab( i )
 
 	def closeEvent( self, event ) :
 #		print 'use menu quit()'
@@ -422,31 +521,43 @@ class MainForm( QtGui.QDialog ) :
 		return QtGui.QIcon( pixmap )
 
 	def refresh( self ) :
-		self.table.clear()
-		self.table.setSortingEnabled(False)
-		for i in mailbox.messages :
-			item = SortedTreeWidgetItem( mailbox.messages[i] )
+		index = self.tab_widget.currentIndex()
+		table = self.tab_widget.currentWidget()
+
+		if index == -1 :
+			return
+
+		table.clear()
+		table.setSortingEnabled(False)
+		for i in self.mailboxen[index].messages :
+			item = SortedTreeWidgetItem( table, self.mailboxen[index].messages[i] )
 			item.setData( 1, QtCore.Qt.UserRole, QtCore.QVariant(i))
-			score = float(mailbox.messages[i][0]) * 10
+			score = float(self.mailboxen[index].messages[i][0]) * 10
 			if score < 0 :	# ham -- go green
 				item.setBackgroundColor( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
 			else :				# spam -- go red
 				item.setBackgroundColor( 0, QtGui.QColor( 255, max(255 - score,0), max(255 - score,0) ) )
-			self.table.addTopLevelItem( item )
-		self.table.setSortingEnabled(True)
+			table.addTopLevelItem( item )
+		table.setSortingEnabled(True)
+		self.onSelectionChange()		# can't delete if no UIDL support
 
 	def strip_err( self, err ) :
 		if err.startswith( '-ERR ' ) :
 			return err[5:]
 
-	def reload( self ) :
+	def reload( self, mb = None ) :
+		if mb == None :		# reload button, not autoreload
+			index = self.tab_widget.currentIndex()
+			mb = self.mailboxen[index]
+			load_settings()
+
 		for i in ( self.reload_button, self.preview_button, self.delete_button ) :
 			i.setEnabled( False )
 
 		tray.trayIcon.setIcon( getIcon( 'mail-send-receive.png' ) )
 
 		try :
-			mailbox.rescan()
+			mb.rescan()
 			err_msg = None
 		except poplib.error_proto, e :
 #			print 'POP3 error:', e
@@ -463,33 +574,51 @@ class MainForm( QtGui.QDialog ) :
 			tray.trayIcon.showMessage( 'POP3 error', err_msg )
 			tray.trayIcon.setIcon( getIcon( 'mail-mark-important.png' ) )
 		else :
-				if mailbox.new_mail :	# new mail arrived?
+				if mb.new_mail :	# new mail has arrived?
 #					tray.trayIcon.setIcon( self.create_icon('mail-mark-unread.png', len( mailbox.messages ) ) )
-					tray.trayIcon.showMessage( 'New mail', "you've got %d new messages" % mailbox.new_mail )
+					tray.trayIcon.showMessage( 'New mail', "%d new messages\n%s" % (mb.new_mail, mb.title()) )
 #				else :
 #					tray.trayIcon.setIcon( self.create_icon('mail.png', len( mailbox.messages ) ) )
 
-				tray.trayIcon.setIcon( self.create_icon('mail.png', len( mailbox.messages ) ) )
+				msg_num = sum( (len(mb.messages) for mb in self.mailboxen ) )
+				tray.trayIcon.setIcon( self.create_icon('mail.png', msg_num ) )
+
+				info = ( (len(mb.messages), mb.new_mail, mb.title(), mb.date ) for mb in self.mailboxen )
+
+				tray.setToolTip( '\n---\n'.join( "%d emails, %d new\n%s\n%s" % i for i in info ) )
 
 		self.refresh()
 
-		self.onSelectionChange()		# can't delete if no UIDL support
 		self.reload_button.setEnabled( True )		# always on
 
-		if not len(mailbox.uidl) :
+		if not len(mb.uidl) :
 			self.delete_button.setToolTip( "requires server with UIDL support" )
 		else :
 			self.delete_button.setToolTip( '' )
 
 	def auto_reload( self ) :
-		self.reload()
-		interval = int(settings.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
-		QtCore.QTimer.singleShot( interval * 60000, self.auto_reload ) # 60000 = 1 min
+		# timer interval might be reset during a lengthy reload
+		self.timer.setInterval( 1 * 60000 ) # 60000 = 1 min
+		self.timer.setSingleShot( True )
+
+		load_settings()
+		self.setup_tabs()
+		self.setup_boxes()
+
+		for mb in self.mailboxen :
+			mb.elapsed += 1
+			if mb.elapsed >= mb.account['interval'] :
+				self.reload( mb )
+				mb.elapsed = 0
+
+		self.timer.start()
 
 	def onDelete( self ) :
 #		print 'delete'
-		items = self.table.selectedItems()
-		if len(mailbox.uidl) == 0 or len(items) == 0 :
+		table = self.tab_widget.currentWidget()
+		index = self.tab_widget.currentIndex()
+		items = table.selectedItems()
+		if len(self.mailboxen[index].uidl) == 0 or len(items) == 0 :
 			return
 
 		reply = QtGui.QMessageBox.question(self, 'PopTray Minus - Delete Messages',
@@ -500,20 +629,22 @@ class MainForm( QtGui.QDialog ) :
 
 #		for i in items :
 #			print i.data( 1, QtCore.Qt.UserRole ).toString()
-		mailbox.killed = set( str( i.data( 1, QtCore.Qt.UserRole ).toString()) for i in items )
+		self.mailboxen[index].killed = set( str( i.data( 1, QtCore.Qt.UserRole ).toString()) for i in items )
 #		print mailbox.killed
 
 		self.reload()
-		mailbox.killed = set()
+		self.mailboxen[index].killed = set()
 
 	def onPreview( self ) :
 #		print 'preview',
-		item = self.table.currentItem()
+		table = self.tab_widget.currentWidget()
+		index = self.tab_widget.currentIndex()
+		item = table.currentItem()
 		item_id = str(item.data( 1, QtCore.Qt.UserRole ).toString())
 #		print item_id
 		if item :
 			try :
-				text = mailbox.get_message( item_id )
+				text = self.mailboxen[index].get_message( item_id )
 			except Exception, e :
 				text = '<font color=red>error : ' + str( e ) + '</font>'
 			BrowserForm( self, 'PopTray - Preview', text ).show()
@@ -523,8 +654,10 @@ class MainForm( QtGui.QDialog ) :
 		self.reload()
 
 	def updatePreviewDelete( self, preview, delete ) :
-		items = self.table.selectedItems()
-		enabled = len(mailbox.uidl) and self.reload_button.isEnabled()
+		index = self.tab_widget.currentIndex()
+		table = self.tab_widget.currentWidget()
+		items = table.selectedItems()
+		enabled = len(self.mailboxen[index].uidl) and self.reload_button.isEnabled()
 		preview.setEnabled( enabled and len(items) == 1 )
 		delete.setEnabled( enabled and len(items) )
 
@@ -540,13 +673,14 @@ class MainForm( QtGui.QDialog ) :
 
 		self.updatePreviewDelete( previewAction, deleteAction )
 
-		offset = QtCore.QPoint( 3, 26 )
-#		print offset, point+offset
+#		offset = QtCore.QPoint( 3, 26 )
 		contextMenu = QtGui.QMenu(self)
 		contextMenu.addAction( previewAction )
 		contextMenu.addSeparator()
 		contextMenu.addAction( deleteAction )
-		contextMenu.exec_( self.table.mapToGlobal( point + offset ))
+		table = self.tab_widget.currentWidget()
+		offset = table.header().geometry().bottomLeft()
+		contextMenu.exec_( table.mapToGlobal( point + offset ))
 
 
 class BrowserForm(QtGui.QDialog):
@@ -567,11 +701,17 @@ class BrowserForm(QtGui.QDialog):
 		self.setWindowTitle( title )
 
 class Mailbox :
-	def __init__( self ) :
+	def __init__( self, acc ) :
+		self.account = acc
 		self.new_mail = 0
 		self.messages = {}
 		self.killed = set()
 		self.uidl = {}
+		self.date = 'never checked'
+		self.elapsed = 200	# 200min, should be bigger than max possible interval
+
+	def title( self ) :
+		return '%s@%s' % (self.account['user'], self.account['host'])
 
 	def decode_stuff( self, stuff ) :
 		lines = list()
@@ -586,20 +726,18 @@ class Mailbox :
 			raise poplib.error_proto( (data[0], ) )
 
 	def is_blacklisted( self, msg_from, msg_to, msg_subj ) :
-			for name in self.black_from_contains :
+			for name in self.account['black_from_contains'] :
 				if msg_from.lower().find( name.lower() ) != -1 :
 					return True
-			for name in self.black_to_contains :
+			for name in self.account['black_to_contains'] :
 				if msg_to.lower().find( name.lower() ) != -1 :
 					return True
 			return False
 
 	def load_messages( self, mbox, nums ) :
 		self.new_mail = 0
-		self.black_from_contains = loadConfigList( 'black_from_contains' )
-		self.black_to_contains = loadConfigList( 'black_to_contains' )
 		for i in nums :
-			tray.setToolTip( 'processing message %d of %d' % (i, len(nums)) )
+			tray.setToolTip( 'processing message %d of %d\n%s' % ( i, len(nums), self.title()) )
 			if debug :
 				print '-' * 80
 			header = mbox.top( i, 0)[1]
@@ -618,12 +756,22 @@ class Mailbox :
 			msg_score = msg['x-spam-score']
 			try :
 				msg_score = msg_score.split()[0]
-			except :
+			except AttributeError :
 				msg_score = 0
 
+			if type(msg_subj) != types.UnicodeType :
+				try :
+					enc = chardet.detect( msg_subj )
+					if enc['encoding'] != 'ascii' :
+						msg_subj = unicode( msg_subj, enc['encoding'] )
+						print 'encoding: ', enc
+				except UnicodeDecodeError, e :
+					if debug :
+						print type(msg_subj)
+					msg_subj = '*****' + str(e)
 			if debug :
-				print 'From: %s\nTo  : %s\nSubj: %s\nDate: %s' % (msg_from,  msg_to,  msg_subj, msg_date)
-				print 'Score:', msg['X-SPAM-SCORE']
+				print u'From: %s\nTo  : %s\nSubj: %s\nDate: %s' % (msg_from,  msg_to,  msg_subj, msg_date)
+				print u'Score:', msg['X-SPAM-SCORE']
 
 			app.processEvents()
 
@@ -650,13 +798,9 @@ class Mailbox :
 			self.messages[msg_id] = [ '%5.1f' % msg_score, msg_from, msg_to, msg_date, msg_subj ]
 
 	def open_mbox( self ) :
-		host = str(settings.value( 'host' ).toString())
-		user = str(settings.value( 'user' ).toString())
-		passwd = str(settings.value( 'pass' ).toString())
-
-		mbox = poplib.POP3(host)
-		mbox.user(user)
-		mbox.pass_(passwd)
+		mbox = poplib.POP3( self.account['host'] )
+		mbox.user( self.account['user'] )
+		mbox.pass_( self.account['pass'] )
 
 		return mbox
 
@@ -735,15 +879,11 @@ class Mailbox :
 
 		self.load_messages( mbox, nums )
 
+		self.date = datetime.datetime.now().strftime( "%F %R" )
+
 		if debug :
 			print '-' * 80
 		mbox.quit()
-
-		host = str(settings.value( 'host' ).toString())
-		user = str(settings.value( 'user' ).toString())
-		date = datetime.datetime.now().strftime( "%F %R" )
-
-		tray.setToolTip( "%d emails, %d new\n%s@%s\n%s" % (len(self.messages), self.new_mail, user, host, date) )
 
 PIXMAPS['mail.png'] = ICONS['mail.png'] = """\
 iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAABHNCSVQICAgIfAhkiAAAAAlwSFlz\
@@ -975,6 +1115,42 @@ v3E8PHrl+dGjV+7u/cvw/x6kbEUFAAAAAP//wmUwMuBiYGAQZGBg4IbyvzAwMHxgYGD4hk8TAAAA\
 //8DAJyYXGpYOXllAAAAAElFTkSuQmCC\
 """
 
+ICONS['plus.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAAZiS0dEAPIA\
+8gDxt03ddgAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9kEAQYYH79Hz/wAAAL1SURBVFjD\
+7Vc9TxtBEH1jrrAbLHo6VwGEXGCK9FfhH0AgEVU6N1GiFPwAmhTp4i7YFoL8A4SQaWkosHCFRIPk\
+wrYUYSy5MLczKe5278N350BspWGka067M2/e7ryZJSSYiGCWRkTx/6NBdeCkDS81ETE+g74pGrzT\
+6eDk5AStVmtmLCwsLMC2bWxvb8OyLBBROEEd/OzsDLlcDvOypaUlXF9fh5nWADqdDlZWVvD4+DjV\
+kf3+e+z/86NPU/cWCgXc3Nwgl8uBiGBpAMfHxyb42toaKpUK8vm8oUujZmbUTnuxZ1OtVomZoZSC\
+Ugrj8RiO4+Dh4QGNRgPdbhd3d3doNpvY2toCAFiaina7bRxVKhXs7LxLzKJ2+jP2/+7uTuKeXq+H\
+er1uYpXLZReAXuA4jlm8uLgIDuYocTUzaSwARAB9wQI+stksgrF04laSM6UkHFAIIAk5ndyDMGrC\
+BJCoJQNgCmctAplCguJI7XsOKAWBlSQarjMJOZsmTQ7rVRJIXlL3xQJgZijWGYtHfzqV7r5wQBEA\
+JC4HCaKWDED5FJrzFEKaQjusr4kHggjCLohnMXB0/luOzg+frXQfvx6mcPQmto4y+M/2CuAVQGwV\
+lEsZemt/SGwD+wf12Nt+sL+XWKQ/vn1+rhDpeqaADqbrodJKKNHaJzDz3wNQSrnORIup1+AkvbOE\
+mlEE74uU0JuXXCn2AkuaEoqWbvgy7iGJAtBDTiIDDk+evUxpBqw8kObgyCcjAGA4HKYz8PT0BMUI\
+tFE/n7Q74IImA0H3BIk0o8vLy0kAwWl4MBh4F0rHJpCIdxIyZR5wj4xCxyUYj8dmXalU8gEQuTe0\
+WCz6M1+thn6/HxqjYhrLhP2qfjHDa/AbjUZoNptm3ebmprkHZiwfDAZYX1/H/f39XMfy1dVVXF1d\
+IZvN+o8TPW63Wi0sLy/PTfUKhQJub2/BzOGHSbBOR6MRLi4uZvo0y2QysG0bGxsbPvVE8Y/TebyM\
+oy/kWT98/8n+ALsSsAYGpiXXAAAAAElFTkSuQmCC\
+"""
+
+ICONS['minus.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAACAAAAAgCAYAAABzenr0AAAAAXNSR0IArs4c6QAAAAZiS0dEAPIA\
+8gDxt03ddgAAAAlwSFlzAAALEwAACxMBAJqcGAAAAAd0SU1FB9kEAQYXOnPbB3QAAAJrSURBVFjD\
+xVc90towEH1raJjJOEPP0FDSUAA3cEVBS8MkZa6QHCC5Qrp0cAYKaGnxjCtqOEBgxpWtTWFLyPLa\
+fD/2l20kWT/7drX71iJUCDN/AuChGUmIKJYmyFEKZs4miNCkMLM50z6bXOXX6xXb7RZhGBow75VO\
+p4MgCLBardDtdkFERQO18t1uh16vh7ak3+/jdDoVPG0AXC4X+L6PtmU0GiGOYwOgqwFsNhvcbjfc\
+bn9bBeD7n7Hf77FYLAAAng6OKIrwURJFkYmBrsmTJAEApAoA2EkQlpKmvKxuwvqUJEnxCmxJVb6S\
+OdvABJAecz7OW3A2V9Lk9BmPMxwRAFgbdV8rUblyhazNAigH5SjXyvRedrDVArA9zpYy5MohzLPj\
+atNy8dtTAOkTvmRhzrZOg7GviLONLARMzRVQXZQ90BjLCGVTnT699ApA+Pb9DzeZer9/fRUtEa6A\
+641+oxRiqxYAs7iwGQD8xiBsAkCK18RACwDYSeEPB1Dh2Uoq/vnjC8nc7taFijrh8ISh+OcASKBT\
+G4TFPLpOlKJWAkV4RRqSU0gki3OAhustUtL72bKa+KVXICxmgYP12YoFEmS5TlhOICIwc00Q6kIC\
+siofyTRNVkXUXtF37hYmAPf7vY6IBGs0CH04O0Hprn3CZMfjsQxA/w2nih/Fxa7lpbJnBaiyXS0V\
+oqL/Z7PZAwARQSmFyWTi5Ot7+Zgrx/P53MSBpzvr9RrD4bD1H9LxeIzlcll+NimlEIYhBoNBq2+C\
+8/kMpdTjCWiDAIA4jnE4HBp9mnmehyAIMJ1OjevNO9H1hN02LdLj9L/LP5MxZnMnLuBRAAAAAElF\
+TkSuQmCC\
+"""
+
 def getIcon(name):
 	icon = ICONS.get(name)
 	if icon is None:
@@ -999,35 +1175,53 @@ def getPixmap(name):
 
 def loadConfigList( name ) :
 	config_list = list()
-	size = settings.beginReadArray( name )
+	size = config.beginReadArray( name )
 	for i in range(size) :
-		settings.setArrayIndex(i)
-		config_list.append( str(settings.value("pattern").toString()) )
-	settings.endArray()
+		config.setArrayIndex(i)
+		config_list.append( str(config.value("pattern").toString()) )
+	config.endArray()
 	return config_list
 
 def saveConfigList( name, config_list ) :
-	settings.beginWriteArray( name );
+	config.beginWriteArray( name );
 	for i,v in enumerate( config_list ) :
-		settings.setArrayIndex(i);
-		settings.setValue("pattern", QtCore.QVariant(v) );
-	settings.endArray();
+		config.setArrayIndex(i);
+		config.setValue("pattern", QtCore.QVariant(v) );
+	config.endArray();
 
-#def defaultConfig() :
-#	black_from_contains = (
-#		'mishajp@gmail.com',  'yurkanovanatalia@yandex.ru',
-#		'subscribe.exler.ru',  'uppsnappat@datormagazin.se'
-#		)
-#
-#	black_to_contains = (
-#		'dafvmcccpu@gaijin-life.info', 'gaijin-life.infogaijin@gaijin-life.info',
-#		'allofmp3@gaijin-life.info', 'dokin@gaijin-life.info'
-#		)
-#	saveConfigList( 'black_from_contains', black_from_contains )
-#	saveConfigList( 'black_to_contains', black_to_contains )
+def fixConfig() :
+	# convert old configs and remove old settings
+	for i in ('host', 'user', 'pass', 'interval' ) :
+		if config.contains( i ) :
+			val = str(config.value( i ).toString())
+			config.beginGroup( 'account0' )
+			config.setValue( i, QtCore.QVariant(val) )
+			config.endGroup()
+			config.remove( i )
 
-#	strings = QtCore.QStringList( ('aaa', 'bbb', 'ccc' ) )
-#	settings.setValue( 'strings', QtCore.QVariant( strings ) )
+	for i in ('black_from_contains', 'black_to_contains' ) :
+		val = loadConfigList( i )
+		if len(val) :
+			config.beginGroup( 'account0' )
+			saveConfigList( i, val )
+			config.endGroup()
+			config.remove( i )
+
+def load_settings() :
+	global settings
+	settings = list()
+	for i in range( len(config.childGroups()) ) :
+		config.beginGroup( 'account%d' % i )
+		if config.contains( 'host' ) :
+			acc = {}
+			acc['host'] = str(config.value( 'host' ).toString())
+			acc['user'] = str(config.value( 'user' ).toString())
+			acc['pass'] = str(config.value( 'pass' ).toString())
+			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
+			acc['black_from_contains'] = loadConfigList( 'black_from_contains' )
+			acc['black_to_contains'] = loadConfigList( 'black_to_contains' )
+			settings.append( acc )
+		config.endGroup()
 
 app = QtGui.QApplication(sys.argv)
 app.setOrganizationDomain('server-pro.com')
@@ -1038,20 +1232,19 @@ debug = '-debug' in sys.argv
 
 app.setQuitOnLastWindowClosed( False )
 
-#settings = QtCore.QSettings( 'PopTray', 'poptray' )
-settings = QtCore.QSettings( os.path.expanduser("~") + '/.poptrayrc', QtCore.QSettings.NativeFormat )
-#settings.beginGroup("outputpanel");
-#settings.setValue("visible", QtCore.QVariant( False ) );
-#settings.endGroup();
+#config = QtCore.QSettings( 'PopTray', 'poptray' )
+config = QtCore.QSettings( os.path.expanduser("~") + '/.poptrayrc', QtCore.QSettings.NativeFormat )
 
-mailbox = Mailbox()
-form = MainForm()
-tray = sysTray()
+fixConfig()	# convert old configs and remove old settings
 
-if not len(settings.allKeys()) :
-	if not ConfigForm().exec_() :
+if not len(config.allKeys()) :
+	if not ConfigForm().exec_() :	# ConfigForm checks for valid host
 		sys.exit()
 
-QtCore.QTimer.singleShot( 1000, form.auto_reload ) # 1 sec
+load_settings()
+#print settings
+
+form = MainForm()
+tray = sysTray()
 
 sys.exit( app.exec_() )
