@@ -17,12 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# $Id: poptray.py 118 2009-04-09 10:58:03Z lenik $
+# $Id: poptray.py 141 2009-05-26 23:58:37Z lenik $
 
 import poplib,  email, base64, codecs, types
 import os, sys, datetime, socket, chardet
 
-__version__ = "0.6.0"
+__version__ = "0.7.0"
 
 ICONS = {}
 PIXMAPS = {}
@@ -90,7 +90,7 @@ class sysTray(QtGui.QWidget):
 #		print 'about!'
 		BrowserForm(self, "PopTray Minus - About",
 u"""
-<h2>PopTray Minus v0.60</h2>
+<h2>PopTray Minus v0.70</h2>
 <h4>Copyright (c) 2009 lenik terenin</h4>
 
 <p>If you're looking at this text, you have already figured out how
@@ -104,8 +104,8 @@ which tells if mailbox is being read or overall statistics otherwise.
 <p>If you change account information or add/delete accounts while PopTray
 Minus is reading your mailboxes, new settings will be applied and tabs for
 new/deleted accounts in the main window will appear or disappear as soon
-as mailbox is closed. And if there were any changes, the corresponding
-mailbox will be reloaded again.
+as mailbox reading is over. And if there were any account data changes,
+the corresponding mailbox will be reloaded again.
 
 <p>Left click on the tray icon brings up the main window with the message
 list. Another left click on the icon hides it back. PopTray Minus does not stop
@@ -120,11 +120,11 @@ may easily kill all you mail. It's a good idea to include as much as possible in
 the search pattern to avoid dangerous mistakes. Actually, PopTray Minus will
 complain if you blacklisting pattern is too short.
 
-<p>Preview/Delete works only is server supports UIDL. Only one message can
+<p>Preview/Delete works only if server supports UIDL. Only one message can
 be previewed (button grays out if several messages are selected), though
 Delete can kill many messages at once. Preview does not download the whole
 message (in case you've got a multimegabyte file attach), but only first NN
-lines (default: 20, does anyone really need this to be changed?)
+lines (default: 100, does anyone really need this to be changed?)
 
 <p>"Score" column shows Spamassassin score if it's configured on your server.
 Positive scores are shown in red and negative scores are shown in green.
@@ -136,14 +136,14 @@ Positive scores are shown in red and negative scores are shown in green.
 <li>complicated filter rule system to confuse newcomers
 </ul>
 
-Personally I use one simple POP3 account only, so chances are multiprotocol
+Personally I use one simple POP3 account only, so chances are the multiprotocol
 support might not be the highest priority. On the other hand, writing large
 regexps is fun enough to try.
 
 <h4>Things that most probably won't be added</h4>
 
 <ul>
-<li>e-mail software support (reply, new, run e-mail program)
+<li>e-mail software support (reply, new, run e-mail program, et al.)
 <li>sound support, because I like it quiet =)
 </ul>
 
@@ -197,15 +197,17 @@ class ConfigPage( QtGui.QWidget ) :
 		form_layout.setWidget( 0, QtGui.QFormLayout.FieldRole, self.mailbox_combo);
 		self.server_edit = QtGui.QLineEdit(self);
 		form_layout.setWidget( 1, QtGui.QFormLayout.FieldRole, self.server_edit);
+		self.port_edit = QtGui.QLineEdit(self);
+		form_layout.setWidget( 2, QtGui.QFormLayout.FieldRole, self.port_edit);
 		self.user_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 2, QtGui.QFormLayout.FieldRole, self.user_edit);
+		form_layout.setWidget( 3, QtGui.QFormLayout.FieldRole, self.user_edit);
 		self.pass_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 3, QtGui.QFormLayout.FieldRole, self.pass_edit);
+		form_layout.setWidget( 4, QtGui.QFormLayout.FieldRole, self.pass_edit);
 		self.interval_combo = QtGui.QComboBox(self);
-		form_layout.setWidget( 4, QtGui.QFormLayout.FieldRole, self.interval_combo);
+		form_layout.setWidget( 5, QtGui.QFormLayout.FieldRole, self.interval_combo);
 
-		buddy_list = ( self.mailbox_combo, self.server_edit, self.user_edit, self.pass_edit, self.interval_combo );
-		buddy_labels = ('P&rotocol :', '&Server :', '&Username :', '&Password :', '&Interval :')
+		buddy_list = ( self.mailbox_combo, self.port_edit, self.server_edit, self.user_edit, self.pass_edit, self.interval_combo );
+		buddy_labels = ('P&rotocol :', '&Server :', '&Port :', '&Username :', '&Password :', '&Interval :')
 		for i,v in enumerate( buddy_labels ) :
 			label = QtGui.QLabel( v, self )
 			form_layout.setWidget( i, QtGui.QFormLayout.LabelRole, label );
@@ -238,6 +240,7 @@ class ConfigPage( QtGui.QWidget ) :
 		self.interval_combo.setEditable( False )
 
 		self.server_edit.setText( str(config.value( 'host' ).toString()) )
+		self.port_edit.setText( str(config.value( 'port', QtCore.QVariant('110') ).toString()) )
 		self.user_edit.setText( str(config.value( 'user' ).toString()) )
 		self.pass_edit.setText( str(config.value( 'pass' ).toString()) )
 
@@ -258,12 +261,18 @@ class ConfigPage( QtGui.QWidget ) :
 
 	def validate_data( self ) :
 		host = str(self.server_edit.text())
+		port = str(self.port_edit.text())
 		user = str(self.user_edit.text())
 		passwd = str(self.pass_edit.text())
 		try :
 			socket.gethostbyname( host )
 		except Exception, (errno, errmsg) :
 			raise Exception, host + ' -- ' + errmsg
+
+		try :
+			port = int(port)
+		except :
+			raise Exception, "port value should be numeric"
 
 		bf = self.extract_patterns( self.black_from, 'From' )
 		bt = self.extract_patterns( self. black_to, 'To' )
@@ -274,11 +283,13 @@ class ConfigPage( QtGui.QWidget ) :
 
 	def save_data( self ) :
 		host = str(self.server_edit.text())
+		port = str(self.port_edit.text())
 		user = str(self.user_edit.text())
 		passwd = str(self.pass_edit.text())
 		interval = int( str( self.interval_combo.currentText() ).split()[0] )
 
 		config.setValue( 'host', QtCore.QVariant( host ) )
+		config.setValue( 'port', QtCore.QVariant( port ) )
 		config.setValue( 'user', QtCore.QVariant( user ) )
 		config.setValue( 'pass', QtCore.QVariant( passwd ) )
 		config.setValue( 'interval', QtCore.QVariant( interval ) )
@@ -546,13 +557,13 @@ class MainForm( QtGui.QDialog ) :
 			return err[5:]
 
 	def reload( self, mb = None ) :
+		for i in ( self.reload_button, self.preview_button, self.delete_button ) :
+			i.setEnabled( False )
+
 		if mb == None :		# reload button, not autoreload
 			index = self.tab_widget.currentIndex()
 			mb = self.mailboxen[index]
 			load_settings()
-
-		for i in ( self.reload_button, self.preview_button, self.delete_button ) :
-			i.setEnabled( False )
 
 		tray.trayIcon.setIcon( getIcon( 'mail-send-receive.png' ) )
 
@@ -717,7 +728,10 @@ class Mailbox :
 		lines = list()
 		for (data, encoding) in email.Header.decode_header( stuff ) :
 			if encoding :
-				data = unicode( data,  encoding )
+				try :
+					data = unicode( data,  encoding )
+				except :
+					pass	# bad encoding, do nothing
 			lines.append( data )
 		return ' '.join( lines )
 
@@ -756,19 +770,28 @@ class Mailbox :
 			msg_score = msg['x-spam-score']
 			try :
 				msg_score = msg_score.split()[0]
-			except AttributeError :
+			except AttributeError :	# 'NoneType' object has no attribute 'split'
+				msg_score = 0
+			except IndexError :		# list index out of range
 				msg_score = 0
 
 			if type(msg_subj) != types.UnicodeType :
 				try :
 					enc = chardet.detect( msg_subj )
-					if enc['encoding'] != 'ascii' :
-						msg_subj = unicode( msg_subj, enc['encoding'] )
+					if enc['encoding'] != 'ascii' and enc['encoding'] != None :
 						print 'encoding: ', enc
+						try :
+							msg_subj = unicode( msg_subj, enc['encoding'] )
+						except :
+							pass	# bad encoding, do nothing
 				except UnicodeDecodeError, e :
 					if debug :
 						print type(msg_subj)
 					msg_subj = '*****' + str(e)
+#				except TypeError, e :
+#					if debug :
+#						print type(msg_subj)
+#					msg_subj = '*****' + str(e)
 			if debug :
 				print u'From: %s\nTo  : %s\nSubj: %s\nDate: %s' % (msg_from,  msg_to,  msg_subj, msg_date)
 				print u'Score:', msg['X-SPAM-SCORE']
@@ -798,7 +821,7 @@ class Mailbox :
 			self.messages[msg_id] = [ '%5.1f' % msg_score, msg_from, msg_to, msg_date, msg_subj ]
 
 	def open_mbox( self ) :
-		mbox = poplib.POP3( self.account['host'] )
+		mbox = poplib.POP3( self.account['host'], self.account['port'] )
 		mbox.user( self.account['user'] )
 		mbox.pass_( self.account['pass'] )
 
@@ -823,7 +846,7 @@ class Mailbox :
 			num_to_uidl = dict( (int(n),num_to_uidl[n]) for n in num_to_uidl )
 			uidl_to_num = dict( (num_to_uidl[n],n) for n in num_to_uidl )
 
-			data = mbox.top( uidl_to_num[msg_id], 20 )
+			data = mbox.top( uidl_to_num[msg_id], 100 )
 			if data[0].startswith( '+OK ' ) :
 				text = '\n'.join( data[1] )
 			else :
@@ -1215,6 +1238,7 @@ def load_settings() :
 		if config.contains( 'host' ) :
 			acc = {}
 			acc['host'] = str(config.value( 'host' ).toString())
+			acc['port'] = int(config.value( 'port', QtCore.QVariant(110) ).toInt()[0])
 			acc['user'] = str(config.value( 'user' ).toString())
 			acc['pass'] = str(config.value( 'pass' ).toString())
 			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
