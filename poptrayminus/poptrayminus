@@ -17,12 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# $Id: poptray.py 176 2010-01-07 10:59:49Z lenik $
+# $Id: poptray.py 177 2010-01-14 04:20:47Z lenik $
 
 import poplib,  email, base64, codecs, types
 import os, sys, datetime, socket, chardet
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 
 ICONS = {}
 PIXMAPS = {}
@@ -90,7 +90,7 @@ class sysTray(QtGui.QWidget):
 #		print 'about!'
 		BrowserForm(self, "PopTray Minus - About",
 u"""
-<h2>PopTray Minus v1.1</h2>
+<h2>PopTray Minus v1.2</h2>
 <h4>Copyright (c) 2009-2010 lenik terenin</h4>
 
 <p>If you're looking at this text, you have already figured out how
@@ -256,7 +256,10 @@ class ConfigPage( QtGui.QWidget ) :
 		self.server_edit.setText( str(config.value( 'host' ).toString()) )
 		self.port_edit.setText( str(config.value( 'port', QtCore.QVariant('110') ).toString()) )
 		self.user_edit.setText( str(config.value( 'user' ).toString()) )
-		self.pass_edit.setText( base64.b64decode( str(config.value( 'passwd' ).toString()) ) )
+		try :
+			self.pass_edit.setText( base64.b64decode( str(config.value( 'passwd' ).toString()) ) )
+		except :
+			pass
 
 		self.black_from.setPlainText( '\n'.join( loadConfigList( 'black_from_contains' ) ) )
 		self.black_to.setPlainText( '\n'.join( loadConfigList( 'black_to_contains' ) ) )
@@ -506,6 +509,13 @@ class MainForm( QtGui.QDialog ) :
 				title = user
 			else :
 				title = '%s@%s' % (user,host)
+
+			try :
+				msg_num = len(self.mailboxen[i].messages)
+				title = '%s - %d' % (title, msg_num)
+			except :
+				pass
+
 			if i < len(self.tables) :
 				self.tab_widget.setTabText( i, title )
 			else :
@@ -546,6 +556,8 @@ class MainForm( QtGui.QDialog ) :
 	def keyPressEvent( self, event ) :
 		if (event.modifiers() == QtCore.Qt.NoModifier and event.key() == QtCore.Qt.Key_Delete ) :
 			self.onDelete()
+		if (event.modifiers() == QtCore.Qt.NoModifier and event.key() == QtCore.Qt.Key_Return ) :
+			self.onPreview()
 		if (event.modifiers() != QtCore.Qt.NoModifier or event.key() != QtCore.Qt.Key_Escape ) :
 			QtGui.QDialog.keyPressEvent( self, event )
 		else :
@@ -1314,7 +1326,10 @@ def load_settings() :
 				passwd = base64.b64encode( str(config.value( 'pass' ).toString()) )
 				config.setValue( 'passwd', QtCore.QVariant( passwd ) )
 				config.remove( 'pass' )
-			acc['pass'] = str(base64.b64decode(str(config.value( 'passwd' ).toString())))
+			try :
+				acc['pass'] = str(base64.b64decode(str(config.value( 'passwd' ).toString())))
+			except :
+				acc['pass'] = ''		# b64decode failed ?
 			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
 			acc['protocol'] = str(config.value( 'protocol', QtCore.QVariant( 'POP3' ) ).toString())
 			acc['black_from_contains'] = loadConfigList( 'black_from_contains' )
