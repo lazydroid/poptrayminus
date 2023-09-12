@@ -17,12 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# $Id: poptray.py 144 2009-06-23 11:24:43Z lenik $
+# $Id: poptray.py 146 2009-07-14 05:21:24Z lenik $
 
 import poplib,  email, base64, codecs, types
 import os, sys, datetime, socket, chardet
 
-__version__ = "0.8.0"
+__version__ = "0.9.0"
 
 ICONS = {}
 PIXMAPS = {}
@@ -90,7 +90,7 @@ class sysTray(QtGui.QWidget):
 #		print 'about!'
 		BrowserForm(self, "PopTray Minus - About",
 u"""
-<h2>PopTray Minus v0.80</h2>
+<h2>PopTray Minus v0.90</h2>
 <h4>Copyright (c) 2009 lenik terenin</h4>
 
 <p>If you're looking at this text, you have already figured out how
@@ -231,6 +231,15 @@ class ConfigPage( QtGui.QWidget ) :
 		layout.addLayout( black_to_layout )
 
 		self.mailbox_combo.addItem( getIcon('internet.png'), 'POP3' )
+		self.mailbox_combo.addItem( getIcon('internet.png'), 'POP3 SSL' )
+		protocol = config.value( 'protocol', QtCore.QVariant( 'POP3' ) ).toString()
+		if protocol == 'POP3' :
+			self.mailbox_combo.setCurrentIndex( 0 )
+		else :
+			self.mailbox_combo.setCurrentIndex( 1 )
+		self.mailbox_combo.setEditable( False )
+#		QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL('activated(int)'), self.onMailbox )
+		QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL( 'currentIndexChanged(int)'), self.onMailbox )
 
 		interval = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
 		for i,v in enumerate( ( 5, 10, 15, 20, 30, 40, 60 ) ) :
@@ -249,6 +258,13 @@ class ConfigPage( QtGui.QWidget ) :
 
 		self.black_from.setToolTip( 'messages with matching substring in "From:" will be deleted' )
 		self.black_to.setToolTip( 'messages with matching substring in "To:" will be deleted' )
+
+	def onMailbox( self, selection ) :
+#		print 'activated: ', selection
+		if selection == 1 :
+			self.port_edit.setText( '995' )
+		else :
+			self.port_edit.setText( '110' )
 
 	def extract_patterns( self, edit, name ) :
 		pats = str( edit.toPlainText() ).split( '\n' )
@@ -287,12 +303,14 @@ class ConfigPage( QtGui.QWidget ) :
 		user = str(self.user_edit.text())
 		passwd = str(self.pass_edit.text())
 		interval = int( str( self.interval_combo.currentText() ).split()[0] )
+		protocol = str( self.mailbox_combo.currentText() )
 
 		config.setValue( 'host', QtCore.QVariant( host ) )
 		config.setValue( 'port', QtCore.QVariant( port ) )
 		config.setValue( 'user', QtCore.QVariant( user ) )
 		config.setValue( 'pass', QtCore.QVariant( passwd ) )
 		config.setValue( 'interval', QtCore.QVariant( interval ) )
+		config.setValue( 'protocol', QtCore.QVariant( protocol ) )
 
 		bf = self.extract_patterns( self.black_from, 'From' )
 		bt = self.extract_patterns( self. black_to, 'To' )
@@ -303,6 +321,8 @@ class ConfigPage( QtGui.QWidget ) :
 	def title( self ) :
 		if not self.server_edit.text() :
 			return '<empty>'
+		if str(self.user_edit.text()).find( '@' ) != -1 :
+			return self.user_edit.text()
 		return '%s@%s' % (self.user_edit.text(), self.server_edit.text())
 
 class ConfigForm( QtGui.QDialog ) :
@@ -469,7 +489,10 @@ class MainForm( QtGui.QDialog ) :
 		for i,acc in enumerate(settings) :
 			host = acc['host']
 			user = acc['user']
-			title = '%s@%s' % (user,host)
+			if user.find( '@' ) != -1 :
+				title = user
+			else :
+				title = '%s@%s' % (user,host)
 			if i < len(self.tables) :
 				self.tab_widget.setTabText( i, title )
 			else :
@@ -725,6 +748,8 @@ class Mailbox :
 		self.elapsed = 200	# 200min, should be bigger than max possible interval
 
 	def title( self ) :
+		if self.account['user'].find('@') != -1 :
+			return self.account['user']	# user name has already included host name
 		return '%s@%s' % (self.account['user'], self.account['host'])
 
 	def decode_stuff( self, stuff ) :
@@ -739,7 +764,7 @@ class Mailbox :
 		return ' '.join( lines )
 
 	def check_error( self, data ) :
-		if not data[0].startswith( '+OK ' ) :
+		if not data[0].startswith( '+OK' ) :
 			raise poplib.error_proto( (data[0], ) )
 
 	def is_blacklisted( self, msg_from, msg_to, msg_subj ) :
@@ -824,7 +849,10 @@ class Mailbox :
 			self.messages[msg_id] = [ '%5.1f' % msg_score, msg_from, msg_to, msg_date, msg_subj ]
 
 	def open_mbox( self ) :
-		mbox = poplib.POP3( self.account['host'], self.account['port'] )
+		if self.account['protocol'] == 'POP3' :
+			mbox = poplib.POP3( self.account['host'], self.account['port'] )
+		else :
+			mbox = poplib.POP3_SSL( self.account['host'], self.account['port'] )
 		mbox.user( self.account['user'] )
 		mbox.pass_( self.account['pass'] )
 
@@ -1245,6 +1273,7 @@ def load_settings() :
 			acc['user'] = str(config.value( 'user' ).toString())
 			acc['pass'] = str(config.value( 'pass' ).toString())
 			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
+			acc['protocol'] = str(config.value( 'protocol', QtCore.QVariant( 'POP3' ) ).toString())
 			acc['black_from_contains'] = loadConfigList( 'black_from_contains' )
 			acc['black_to_contains'] = loadConfigList( 'black_to_contains' )
 			settings.append( acc )

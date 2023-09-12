@@ -21,3 +21,9 @@ poptrayminus (0.8.0) UNRELEASED; urgency=medium
   * Bugfix release. (Closes: #XXXXXX)
 
  -- lenik <lenik@lazydroid.com>  Tue, 23 Jun 2009 22:26:30 +0900
+
+poptrayminus (0.9.0) UNRELEASED; urgency=medium
+
+  * POP3 SSL support. (Closes: #XXXXXX)
+
+ -- lenik <lenik@lazydroid.com>  Tue, 14 Jul 2009 22:26:30 +0900
