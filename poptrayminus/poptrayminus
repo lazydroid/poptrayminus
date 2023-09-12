@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # poptray.py -- POP3 message checker and filter
-# Copyright (C) 2009 lenik terenin
+# Copyright (C) 2009-2010 lenik terenin
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,12 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# $Id: poptray.py 146 2009-07-14 05:21:24Z lenik $
+# $Id: poptray.py 172 2010-01-03 04:52:00Z lenik $
 
 import poplib,  email, base64, codecs, types
 import os, sys, datetime, socket, chardet
 
-__version__ = "0.9.0"
+__version__ = "1.0.0"
 
 ICONS = {}
 PIXMAPS = {}
@@ -90,8 +90,8 @@ class sysTray(QtGui.QWidget):
 #		print 'about!'
 		BrowserForm(self, "PopTray Minus - About",
 u"""
-<h2>PopTray Minus v0.90</h2>
-<h4>Copyright (c) 2009 lenik terenin</h4>
+<h2>PopTray Minus v1.0</h2>
+<h4>Copyright (c) 2009-2010 lenik terenin</h4>
 
 <p>If you're looking at this text, you have already figured out how
 to right-click a context menu from the icon in the tray =)
@@ -116,9 +116,9 @@ click on the close icon in the window corner.
 
 <p>Current filter system only supports substring search within from/to/subj
 fields of the message header. Please, be careful, searching for a single letter
-may easily kill all you mail. It's a good idea to include as much as possible in
+may easily kill all your mail. It's a good idea to include as much as possible in
 the search pattern to avoid dangerous mistakes. Actually, PopTray Minus will
-complain if you blacklisting pattern is too short.
+complain if your blacklisting pattern is too short.
 
 <p>Preview/Delete works only if server supports UIDL. Only one message can
 be previewed (button grays out if several messages are selected), though
@@ -163,7 +163,7 @@ lenik@server-pro.com</a>
 
 <h4>Thanks</h4>
 
-<p>Thank your for using PopTray Minus! Also I woudl like to thank
+<p>Thank you for using PopTray Minus! Also I woudl like to thank
 the original creator of PopTray &mdash; Renier Crause, who gave
 me the idea, Trolltech for Qt toolkit, Phil Thompson for PyQt
 bindings, Guido van Rossum for Python and Mark Summerfield for
@@ -193,21 +193,24 @@ class ConfigPage( QtGui.QWidget ) :
 		# server parms
 		form_layout = QtGui.QFormLayout()
 
+		self.name_edit = QtGui.QLineEdit(self);
+		form_layout.setWidget( 0, QtGui.QFormLayout.FieldRole, self.name_edit);
 		self.mailbox_combo = QtGui.QComboBox(self);
-		form_layout.setWidget( 0, QtGui.QFormLayout.FieldRole, self.mailbox_combo);
+		form_layout.setWidget( 1, QtGui.QFormLayout.FieldRole, self.mailbox_combo);
 		self.server_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 1, QtGui.QFormLayout.FieldRole, self.server_edit);
+		form_layout.setWidget( 2, QtGui.QFormLayout.FieldRole, self.server_edit);
 		self.port_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 2, QtGui.QFormLayout.FieldRole, self.port_edit);
+		form_layout.setWidget( 3, QtGui.QFormLayout.FieldRole, self.port_edit);
 		self.user_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 3, QtGui.QFormLayout.FieldRole, self.user_edit);
+		form_layout.setWidget( 4, QtGui.QFormLayout.FieldRole, self.user_edit);
 		self.pass_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 4, QtGui.QFormLayout.FieldRole, self.pass_edit);
+		self.pass_edit.setEchoMode(QtGui.QLineEdit.Password);
+		form_layout.setWidget( 5, QtGui.QFormLayout.FieldRole, self.pass_edit);
 		self.interval_combo = QtGui.QComboBox(self);
-		form_layout.setWidget( 5, QtGui.QFormLayout.FieldRole, self.interval_combo);
+		form_layout.setWidget( 6, QtGui.QFormLayout.FieldRole, self.interval_combo);
 
-		buddy_list = ( self.mailbox_combo, self.port_edit, self.server_edit, self.user_edit, self.pass_edit, self.interval_combo );
-		buddy_labels = ('P&rotocol :', '&Server :', '&Port :', '&Username :', '&Password :', '&Interval :')
+		buddy_list = ( self.name_edit, self.mailbox_combo, self.port_edit, self.server_edit, self.user_edit, self.pass_edit, self.interval_combo );
+		buddy_labels = ('&Name:', 'P&rotocol :', '&Server :', '&Port :', '&Username :', '&Password :', '&Interval :')
 		for i,v in enumerate( buddy_labels ) :
 			label = QtGui.QLabel( v, self )
 			form_layout.setWidget( i, QtGui.QFormLayout.LabelRole, label );
@@ -248,6 +251,7 @@ class ConfigPage( QtGui.QWidget ) :
 				self.interval_combo.setCurrentIndex( i )
 		self.interval_combo.setEditable( False )
 
+		self.name_edit.setText( str(config.value( 'name' ).toString()) )
 		self.server_edit.setText( str(config.value( 'host' ).toString()) )
 		self.port_edit.setText( str(config.value( 'port', QtCore.QVariant('110') ).toString()) )
 		self.user_edit.setText( str(config.value( 'user' ).toString()) )
@@ -276,6 +280,7 @@ class ConfigPage( QtGui.QWidget ) :
 		return pats
 
 	def validate_data( self ) :
+		name = str(self.name_edit.text())
 		host = str(self.server_edit.text())
 		port = str(self.port_edit.text())
 		user = str(self.user_edit.text())
@@ -298,6 +303,7 @@ class ConfigPage( QtGui.QWidget ) :
 				raise Exception, '%s can not be empty' % v
 
 	def save_data( self ) :
+		name = str(self.name_edit.text())
 		host = str(self.server_edit.text())
 		port = str(self.port_edit.text())
 		user = str(self.user_edit.text())
@@ -305,6 +311,7 @@ class ConfigPage( QtGui.QWidget ) :
 		interval = int( str( self.interval_combo.currentText() ).split()[0] )
 		protocol = str( self.mailbox_combo.currentText() )
 
+		config.setValue( 'name', QtCore.QVariant( name ) )
 		config.setValue( 'host', QtCore.QVariant( host ) )
 		config.setValue( 'port', QtCore.QVariant( port ) )
 		config.setValue( 'user', QtCore.QVariant( user ) )
@@ -319,6 +326,8 @@ class ConfigPage( QtGui.QWidget ) :
 		saveConfigList( 'black_to_contains', bt )
 
 	def title( self ) :
+		if self.name_edit.text() :
+			return self.name_edit.text()
 		if not self.server_edit.text() :
 			return '<empty>'
 		if str(self.user_edit.text()).find( '@' ) != -1 :
@@ -487,9 +496,12 @@ class MainForm( QtGui.QDialog ) :
 		load_settings()
 		headers = [ 'Score', 'From', 'To', 'Date', 'Subject' ]
 		for i,acc in enumerate(settings) :
+			name = acc['name']
 			host = acc['host']
 			user = acc['user']
-			if user.find( '@' ) != -1 :
+			if name :
+				title = name
+			elif user.find( '@' ) != -1 :
 				title = user
 			else :
 				title = '%s@%s' % (user,host)
@@ -517,6 +529,7 @@ class MainForm( QtGui.QDialog ) :
 				table.setColumnWidth( 2, self.size().width()/4 )
 				table.setAlternatingRowColors(True)
 				table.setSelectionMode( QtGui.QTreeWidget.ExtendedSelection )
+				table.sortByColumn(3, QtCore.Qt.DescendingOrder)
 				table.setSortingEnabled(True)
 
 		for i in range(len(settings),len(self.tables)) :
@@ -748,6 +761,8 @@ class Mailbox :
 		self.elapsed = 200	# 200min, should be bigger than max possible interval
 
 	def title( self ) :
+		if self.account['name'] :
+			return self.account['name']
 		if self.account['user'].find('@') != -1 :
 			return self.account['user']	# user name has already included host name
 		return '%s@%s' % (self.account['user'], self.account['host'])
@@ -776,6 +791,27 @@ class Mailbox :
 					return True
 			return False
 
+	def convert_to_unicode( self, string ) :
+		if type(string) != types.UnicodeType :
+			try :
+				enc = chardet.detect( string )
+				if enc['encoding'] != 'ascii' and enc['encoding'] != None :
+					if debug :
+						print 'encoding: ', enc
+					try :
+						string = unicode( string, enc['encoding'] )
+					except :
+						pass	# bad encoding, do nothing
+			except UnicodeDecodeError, e :
+				if debug :
+					print type(string)
+				string = '*****' + str(e)
+#			except TypeError, e :
+#				if debug :
+#					print type(msg_subj)
+#				msg_subj = '*****' + str(e)
+		return string
+
 	def load_messages( self, mbox, nums ) :
 		self.new_mail = 0
 		for i in nums :
@@ -803,23 +839,10 @@ class Mailbox :
 			except IndexError :		# list index out of range
 				msg_score = 0
 
-			if type(msg_subj) != types.UnicodeType :
-				try :
-					enc = chardet.detect( msg_subj )
-					if enc['encoding'] != 'ascii' and enc['encoding'] != None :
-						print 'encoding: ', enc
-						try :
-							msg_subj = unicode( msg_subj, enc['encoding'] )
-						except :
-							pass	# bad encoding, do nothing
-				except UnicodeDecodeError, e :
-					if debug :
-						print type(msg_subj)
-					msg_subj = '*****' + str(e)
-#				except TypeError, e :
-#					if debug :
-#						print type(msg_subj)
-#					msg_subj = '*****' + str(e)
+			msg_from = self.convert_to_unicode( msg_from )
+			msg_to = self.convert_to_unicode( msg_to )
+			msg_subj = self.convert_to_unicode( msg_subj )
+
 			if debug :
 				print u'From: %s\nTo  : %s\nSubj: %s\nDate: %s' % (msg_from,  msg_to,  msg_subj, msg_date)
 				print u'Score:', msg['X-SPAM-SCORE']
@@ -878,7 +901,7 @@ class Mailbox :
 			uidl_to_num = dict( (num_to_uidl[n],n) for n in num_to_uidl )
 
 			data = mbox.top( uidl_to_num[msg_id], 100 )
-			if data[0].startswith( '+OK ' ) :
+			if data[0].startswith( '+OK' ) :
 				text = '\n'.join( data[1] )
 			else :
 				text = data[0]
@@ -1268,6 +1291,7 @@ def load_settings() :
 		config.beginGroup( 'account%d' % i )
 		if config.contains( 'host' ) :
 			acc = {}
+			acc['name'] = str(config.value( 'name' ).toString())
 			acc['host'] = str(config.value( 'host' ).toString())
 			acc['port'] = int(config.value( 'port', QtCore.QVariant(110) ).toInt()[0])
 			acc['user'] = str(config.value( 'user' ).toString())
