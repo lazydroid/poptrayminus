@@ -3,3 +3,21 @@ poptrayminus (0.5.0) UNRELEASED; urgency=medium
   * Initial release. (Closes: #XXXXXX)
 
  -- lenik <lenik@lazydroid.com>  Wed, 01 Apr 2009 22:26:30 +0900
+
+poptrayminus (0.6.0) UNRELEASED; urgency=medium
+
+  * More features. (Closes: #XXXXXX)
+
+ -- lenik <lenik@lazydroid.com>  Mon, 13 Apr 2009 22:26:30 +0900
+
+poptrayminus (0.7.0) UNRELEASED; urgency=medium
+
+  * Better interface. (Closes: #XXXXXX)
+
+ -- lenik <lenik@lazydroid.com>  Tue, 23 Jun 2009 22:26:30 +0900
+
+poptrayminus (0.8.0) UNRELEASED; urgency=medium
+
+  * Bugfix release. (Closes: #XXXXXX)
+
+ -- lenik <lenik@lazydroid.com>  Tue, 23 Jun 2009 22:26:30 +0900

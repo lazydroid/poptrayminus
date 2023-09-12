@@ -17,12 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# $Id: poptray.py 141 2009-05-26 23:58:37Z lenik $
+# $Id: poptray.py 144 2009-06-23 11:24:43Z lenik $
 
 import poplib,  email, base64, codecs, types
 import os, sys, datetime, socket, chardet
 
-__version__ = "0.7.0"
+__version__ = "0.8.0"
 
 ICONS = {}
 PIXMAPS = {}
@@ -90,7 +90,7 @@ class sysTray(QtGui.QWidget):
 #		print 'about!'
 		BrowserForm(self, "PopTray Minus - About",
 u"""
-<h2>PopTray Minus v0.70</h2>
+<h2>PopTray Minus v0.80</h2>
 <h4>Copyright (c) 2009 lenik terenin</h4>
 
 <p>If you're looking at this text, you have already figured out how
@@ -384,7 +384,10 @@ class ConfigForm( QtGui.QDialog ) :
 
 		config.sync()
 
-		form.timer.setInterval( 1000 )	# 1 sec to form.reload
+		try :
+			form.timer.setInterval( 1000 )	# 1 sec to form.reload
+		except :
+			pass	# there may be no form open yet
 
 		QtGui.QDialog.accept(self)
 
