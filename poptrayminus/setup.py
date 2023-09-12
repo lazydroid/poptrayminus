@@ -5,7 +5,7 @@ from distutils.core import setup
 
 setup(
 	name = 'poptrayminus',
-	version = '0.7.0',
+	version = '0.8.0',
 	description = 'POP3 mailbox monitor with tray icon notifications',
 	long_description = 'PopTray Minus checks POP3 mailbox, filters spam and shows message header previews.',
 	author = 'Lenik Terenin',
