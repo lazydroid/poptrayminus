@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Encoding=UTF-8
+Name=PopTray Minus
+Comment=Check your POP3 mailbox and show tray icon with notifications
+Exec=poptrayminus
+Icon=poptrayminus
+Terminal=false
+StartupNotify=false
+Type=Application
+Categories=Network;Application;
+X-Desktop-File-Install-Version=0.15

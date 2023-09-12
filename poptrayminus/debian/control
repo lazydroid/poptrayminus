@@ -1,0 +1,21 @@
+Source: poptrayminus
+Section: python
+Priority: optional
+Maintainer: lenik, <lenik@lazydroid.com>
+Build-Depends: debhelper (>= 7),
+               python-qt4,
+               python (>= 2.6.6-3~)
+Standards-Version: 3.9.2
+X-Python-Version: >= 2.6
+
+
+Package: poptrayminus
+Architecture: all
+Section: python
+Depends: python-appindicator, ${misc:Depends}, ${python:Depends}
+Description: POP3 mailbox monitor with tray icon notifications and preview/delete functions for spam control
+ POP3 mailbox monitor with tray icon notifications and preview/delete functions for spam control PopTray Minus
+ is a Linux clone of original PopTray written in Python/Qt. PopTray Minus lives happily in the tray, regularly
+ checks message headers in POP3 mailbox, applies basic filters based on from/to/subj contents, allows a sneak
+ peek to preview the message body and, of course, features a very handy delete button to manually remove
+ unwanted messages.

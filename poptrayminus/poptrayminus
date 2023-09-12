@@ -1,0 +1,1057 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+# poptray.py -- POP3 message checker and filter
+# Copyright (C) 2009 lenik terenin
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# version 2 as published by the Free Software Foundation.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+# $Id: poptray.py 102 2009-04-01 01:21:11Z lenik $
+
+import poplib,  email, base64, codecs
+import os, sys, datetime, socket
+
+__version__ = "0.5.0"
+
+ICONS = {}
+PIXMAPS = {}
+
+try :
+	from PyQt4 import QtCore, QtGui
+except ImportError, e :
+	print 'Import error "%s", please reinstall PyQt4 libraries' % e
+	print '"sudo apt-get install python-qt4" may do the trick on Debian/Ubuntu'
+	sys.exit()
+
+sys.stdin = codecs.getreader("UTF8")(sys.stdin)
+sys.stdout = codecs.getwriter("UTF8")(sys.stdout)
+
+class sysTray(QtGui.QWidget):
+
+	def __init__(self, parent=None):
+		QtGui.QWidget.__init__(self, parent)
+		self.createActions()
+		self.createTrayIcon()
+		self.trayIcon.show()
+
+	def createActions(self):
+		self.aboutAction = QtGui.QAction( getIcon('gtk-about.png'), self.tr('&About'), self )
+		QtCore.QObject.connect(self.aboutAction, QtCore.SIGNAL("triggered()"), self.onAbout )
+		self.configAction = QtGui.QAction( getIcon('properties.png'), self.tr('&Settings'), self )
+		QtCore.QObject.connect(self.configAction, QtCore.SIGNAL("triggered()"), self.onConfig )
+		self.quitAction = QtGui.QAction( getIcon('gtk-quit.png'), self.tr("&Quit"), self)
+		QtCore.QObject.connect(self.quitAction, QtCore.SIGNAL("triggered()"), QtGui.qApp, QtCore.SLOT("quit()"))
+
+	def createTrayIcon(self):
+		self.trayIconMenu = QtGui.QMenu(self)
+		self.trayIconMenu.addAction(self.aboutAction)
+		self.trayIconMenu.addAction(self.configAction)
+		self.trayIconMenu.addSeparator()
+		self.trayIconMenu.addAction(self.quitAction)
+		self.trayIcon = QtGui.QSystemTrayIcon(self)
+		self.trayIcon.setContextMenu(self.trayIconMenu)
+		self.trayIcon.setIcon( getIcon( 'mail.png' ) )
+		QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('activated(QSystemTrayIcon::ActivationReason)'), self.onActivation )
+#		QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('messageClicked()'), self.onMessageClicked )
+
+	def onActivation(self, reason) :
+#		print 'onActivation'
+		if reason != QtGui.QSystemTrayIcon.Context :
+			if form.isHidden() :
+				form.refresh()
+				form.showNormal()	# form.show() ?
+				form.activateWindow()
+				form.raise_()
+			else :
+				form.hide()
+
+	def onConfig(self) :
+#		print 'config!'
+		ConfigForm(self).show()
+
+#	def onMessageClicked(self) :
+#		print 'clicked!!'
+
+	def setToolTip( self, tip ) :
+		self.trayIcon.setToolTip( tip )
+
+	def onAbout(self) :
+#		print 'about!'
+		BrowserForm(self, "PopTray Minus - About",
+u"""
+<h2>PopTray Minus v0.50</h2>
+<h4>Copyright (c) 2009 lenik terenin</h4>
+<p>This document explains the basic functions and limitations of
+PopTray Minus software as well as provides an information about the
+future development plans.
+
+<h4>History</h4>
+<p>I've started this project after moving to Linux. I tried to find
+a good replacement for a very convenient windows tool -- Poptray.
+Unfortunately, there was no linux-based alternative at the moment,
+so I had to roll my own. I did not plan to add any new features, but
+ony implement a useful subset of what we had in PopTray. Hence the
+name -- PopTray Minus.
+
+<h4>Main Features</h4>
+<p>According to my original plans PopTray Minus should:
+
+<ul>
+<li>live happily in the tray
+<li>regularly check message headers in my POP3 mailbox
+<li>apply basic filters based on from/to/subj contents
+<li>allow a sneak peek to preview the message body
+<li>feature a delete function to manually remove unwanted messages
+</ul>
+
+<p>Tray life is easy with PyQt4. Left click brings up the main window with
+the message list. Another left click on the icon hides it back. PopTray Minus
+does not stop running even when the main window is gone. You have to right
+click on the icon and select "Quit" in the menu if you really want to quit. Main
+window (as well as all other windows) can also be dismissed with Esc key or
+click on the close icon in the window corner.
+
+<p>Mailbox is open every NN minutes (can be changed in Settings, default: 15),
+message headers are retrieved, blacklisted messages are removed and mailbox is closed
+again. Countdown timer until the next mailbox rescan is reset only when the box is
+already closed to avoid dealing with short rescan intervals and large mailboxes.
+
+<p>Current filter system only supports substring search within from/to/subj
+fields of the message header. Please, be careful, searching for a single letter
+may easily kill all you mail. It's a good idea to include as much as possible in
+the search pattern to avoid dangerous mistakes.
+
+<p>Preview/Delete works only is server supports UIDL. Only one message can
+be previewed (button grays out if several messages are selected), though
+Delete can kill many messages at once. Preview does not download the whole
+message (in case you've got a multimegabyte file attach), but only first NN
+lines (configurable, default: 20)
+
+<p>"Score" column shows Spamassassin score if it's configured on your server.
+Positive scores are shown in red and negative scores are shown in green.
+
+<h4>Requrements</h4>
+
+There are only three requirements to use PopTray Minus:
+
+<ul>
+<li>Python and PyQt4 (required)
+<li>KDE or GNOME (recommended)
+<li>UIDL support on POP3 server (recommended)
+</ul>
+
+<p>PopTray Minus is written in Python using PyQt4 GUI libraries, so these
+two things are required. Fortunately, Python is already installed and PyQt4
+is available for installation on most contemporary linux distributions. If you
+use Windows or Mac OS X your mileage may vary.
+
+<p>Main idea is to hide in the tray, so we need a good X11 based GUI
+manager that implements the freedesktop.org system tray specification
+(recent versions of KDE and GNOME). According to the PyQt4 manuals
+Windows and Mac OS X may also be supported but I haven't checked it yet.
+
+<p>POP3 server with UIDL support is almost required. UIDL is important
+because it allows us to track messages between POP3 sessions while
+other programs may access and/or modify the mailbox contents. If your
+server lacks UIDL, you won't be able to preview/delete messages, however
+message list and basic from/to/subj filters should work just fine.
+
+<h4>Things to be added later (maybe)</h4>
+
+<ul>
+<li>multi-account support
+<li>multiprotocol support (POP3SSL, IMAP)
+<li>complicated filter rule system to confuse newcomers
+</ul>
+
+Personally I use one simple POP3 account only, so chances are multiprotocol
+and multi-accoint support might not be the highest priority. On the other hand,
+writing large regexps is fun enough to try.
+
+<h4>Things that most probably won't be added</h4>
+
+<ul>
+<li>e-mail software support (reply, new, run e-mail program)
+<li>sound support, because I like it quiet =)
+</ul>
+
+Dealing with e-mail software in a cross-platform compatible way is a major
+problem, that's why I don't even want to touch this. After all, I hope someday
+PopTray Minus will work not only on Linux.
+
+<h4>Updates</h4>
+<p>
+You can find the latest versions of this software at:
+
+<ul>
+<li><a href="http://server-pro.com/poptrayminus/">PopTray Minus Home</a>
+</ul>
+
+<p>Press <b>Esc</b> to close this window.
+"""
+		).show()
+
+class SortedTreeWidgetItem( QtGui.QTreeWidgetItem ) :
+
+	def __lt__( self, other ) :
+		if not form.table.sortColumn() :
+			try :
+				return float(self.text(0)) < float(other.text(0))
+			except:
+				pass	# not a float maybe
+		return QtGui.QTreeWidgetItem.__lt__( self, other )
+
+	def __ge__( self, other ) :
+		raise 'holy shit'
+
+class ConfigForm( QtGui.QDialog ) :
+	def __init__( self, parent = None ) :
+		super( ConfigForm, self ).__init__( parent )
+
+		self.setWindowTitle( 'PopTray Minus - Settings' )
+		self.resize( 340, 540 )
+
+		# server parms
+		form_layout = QtGui.QFormLayout()
+
+		self.mailbox_combo = QtGui.QComboBox(self);
+		form_layout.setWidget( 0, QtGui.QFormLayout.FieldRole, self.mailbox_combo);
+		self.server_edit = QtGui.QLineEdit(self);
+		form_layout.setWidget( 1, QtGui.QFormLayout.FieldRole, self.server_edit);
+		self.user_edit = QtGui.QLineEdit(self);
+		form_layout.setWidget( 2, QtGui.QFormLayout.FieldRole, self.user_edit);
+		self.pass_edit = QtGui.QLineEdit(self);
+		form_layout.setWidget( 3, QtGui.QFormLayout.FieldRole, self.pass_edit);
+		self.interval_combo = QtGui.QComboBox(self);
+		form_layout.setWidget( 4, QtGui.QFormLayout.FieldRole, self.interval_combo);
+
+		buddy_list = ( self.mailbox_combo, self.server_edit, self.user_edit, self.pass_edit, self.interval_combo );
+		buddy_labels = ('P&rotocol :', '&Server :', '&Username :', '&Password :', '&Interval :')
+		for i,v in enumerate( buddy_labels ) :
+			label = QtGui.QLabel( v, self )
+			form_layout.setWidget( i, QtGui.QFormLayout.LabelRole, label );
+			label.setBuddy( buddy_list[i] )
+
+		# black lists
+		self.black_from = QtGui.QPlainTextEdit( self  )
+		black_from_layout = QtGui.QVBoxLayout()
+		black_from_layout.addWidget( QtGui.QLabel( 'Blacklist if "From" contains (one line - one pattern):', self ) )
+		black_from_layout.addWidget( self.black_from )
+
+		self.black_to = QtGui.QPlainTextEdit( self  )
+		black_to_layout = QtGui.QVBoxLayout()
+		black_to_layout.addWidget( QtGui.QLabel( 'Blacklist if "To" contains (one line - one pattern):', self ) )
+		black_to_layout.addWidget( self.black_to )
+
+		button_box = QtGui.QDialogButtonBox( QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel )
+		button_box.button( QtGui.QDialogButtonBox.Ok ).setDefault(True)
+
+		# overall layout
+		layout = QtGui.QVBoxLayout( self )
+		layout.addLayout( form_layout )
+		layout.addLayout( black_from_layout )
+		layout.addLayout( black_to_layout )
+		layout.addWidget( button_box )
+
+		self.connect( button_box, QtCore.SIGNAL("accepted()"), self, QtCore.SLOT("accept()"))
+		self.connect( button_box, QtCore.SIGNAL("rejected()"), self, QtCore.SLOT("reject()"))
+
+		self.mailbox_combo.addItem( getIcon('internet.png'), 'POP3' )
+
+		interval = int(settings.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
+		for i,v in enumerate( ( 5, 10, 15, 20, 30, 40, 60 ) ) :
+			self.interval_combo.addItem( '%d min' % v )
+			if interval >= v :
+				self.interval_combo.setCurrentIndex( i )
+		self.interval_combo.setEditable( False )
+
+		self.server_edit.setText( str(settings.value( 'host' ).toString()) )
+		self.user_edit.setText( str(settings.value( 'user' ).toString()) )
+		self.pass_edit.setText( str(settings.value( 'pass' ).toString()) )
+
+		self.black_from.setPlainText( '\n'.join( loadConfigList( 'black_from_contains' ) ) )
+		self.black_to.setPlainText( '\n'.join( loadConfigList( 'black_to_contains' ) ) )
+
+		self.black_from.setToolTip( 'messages with matching substring in "From:" will be deleted' )
+		self.black_to.setToolTip( 'messages with matching substring in "To:" will be deleted' )
+
+	def extract_patterns( self, edit, name ) :
+		pats = str( edit.toPlainText() ).split( '\n' )
+		pats = list( i for i in pats if len(i) )
+		bad = list( i for i in pats if len(i) < 4 )
+		if len(bad) :
+			raise Exception, 'Black "%s" patterns are too short,\nsupposed to be at least 5 characters long:\n%s' % (name, str(bad))
+
+		return pats
+
+	def accept( self ) :
+		host = str(self.server_edit.text())
+		user = str(self.user_edit.text())
+		passwd = str(self.pass_edit.text())
+		try :
+			socket.gethostbyname( host )
+		except Exception, (errno, errmsg) :
+			QtGui.QMessageBox.warning( self, 'Error', host + ' -- ' + errmsg )
+			return
+
+		try :
+			bf = self.extract_patterns( self.black_from, 'From' )
+			bt = self.extract_patterns( self. black_to, 'To' )
+		except Exception, e :
+			QtGui.QMessageBox.warning( self, 'Error', str(e) )
+			return
+
+		for i,v in (( host, 'Server address'), ( user, 'User name' ) ) :
+			if not len(i) :
+				QtGui.QMessageBox.warning( self, 'Error', '%s can not be empty' % v )
+				return
+
+		interval = int( str( self.interval_combo.currentText() ).split()[0] )
+
+		settings.setValue( 'host', QtCore.QVariant( host ) )
+		settings.setValue( 'user', QtCore.QVariant( user ) )
+		settings.setValue( 'pass', QtCore.QVariant( passwd ) )
+		settings.setValue( 'interval', QtCore.QVariant( interval ) )
+
+		saveConfigList( 'black_from_contains', bf )
+		saveConfigList( 'black_to_contains', bt )
+
+		settings.sync()
+
+		QtGui.QDialog.accept(self)
+
+class MainForm( QtGui.QDialog ) :
+
+	def __init__( self, parent = None ) :
+		super( MainForm, self ).__init__( parent )
+		self.table = QtGui.QTreeWidget()
+
+		self.reload_button = QtGui.QPushButton( 'reload', self )
+		self.reload_button.setIcon( getIcon( 'reload.png' ) )
+		self.delete_button = QtGui.QPushButton( 'delete', self )
+		self.delete_button.setIcon( getIcon( 'delete.png' ) )
+		self.preview_button = QtGui.QPushButton( 'preview', self )
+		self.preview_button.setIcon( getIcon( 'preview.png' ) )
+		button_layout = QtGui.QHBoxLayout()
+		button_layout.addWidget( self.preview_button )
+		button_layout.addWidget( self.delete_button )
+		button_layout.addStretch()
+		button_layout.addWidget( self.reload_button )
+		layout = QtGui.QVBoxLayout()
+		layout.addWidget( self.table )
+		layout.addLayout( button_layout )
+		self.setLayout( layout )
+
+		self.connect( self.preview_button, QtCore.SIGNAL( 'clicked()' ), self.onPreview )
+		self.connect( self.delete_button, QtCore.SIGNAL( 'clicked()' ), self.onDelete )
+		self.connect( self.reload_button, QtCore.SIGNAL( 'clicked()' ), self.onReload )
+
+		self.connect( self.table, QtCore.SIGNAL( 'itemSelectionChanged()' ), self.onSelectionChange )
+
+		self.table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
+		self.connect( self.table, QtCore.SIGNAL('customContextMenuRequested(QPoint)'), self.onContext)
+
+		self.setWindowTitle( 'PopTray Minus' )
+		geometry = QtGui.QApplication.desktop().availableGeometry()
+		width = max( geometry.width() / 2, 700 )
+		height = max( geometry.height() / 2, 300 )
+		self.resize( width, height )
+#		print width, height
+
+		headers = [ 'Score', 'From', 'To', 'Date', 'Subject' ]
+		self.table.setHeaderLabels( headers )
+
+#		self.table.setSortingEnabled(False)
+#		self.table.setColumnWidth( 0, 70 )
+		self.table.addTopLevelItem( QtGui.QTreeWidgetItem(
+				[ '-20.0', 'werwer', 'asdasdads', '2009-00-00 00:00:00' ] ) )
+		self.table.resizeColumnToContents( 0 )
+		self.table.resizeColumnToContents( 3 )
+		self.table.clear()
+
+		self.table.setColumnWidth( 1, self.size().width()/4 )
+		self.table.setColumnWidth( 2, self.size().width()/4 )
+		self.table.setAlternatingRowColors(True)
+#		self.table.setSelectionBehavior( QTreeWidget.SelectRows )
+		self.table.setSelectionMode( QtGui.QTreeWidget.ExtendedSelection )
+		self.onSelectionChange()
+
+	def closeEvent( self, event ) :
+#		print 'use menu quit()'
+		event.ignore()
+		self.hide()
+
+	def keyPressEvent( self, event ) :
+		if (event.modifiers() == QtCore.Qt.NoModifier and event.key() == QtCore.Qt.Key_Delete ) :
+			self.onDelete()
+		if (event.modifiers() != QtCore.Qt.NoModifier or event.key() != QtCore.Qt.Key_Escape ) :
+			QtGui.QDialog.keyPressEvent( self, event )
+		else :
+			event.ignore()
+			self.hide()
+
+	def create_icon( self, name, number ) :
+		pixmap = getPixmap( name )
+		( h, w ) = ( pixmap.height(), pixmap.width() )
+
+		text = str( number )
+		painter = QtGui.QPainter( pixmap )
+		font = QtGui.QFont( "Sans Serif", 7, QtGui.QFont.Bold )
+		( fw, fh ) = ( QtGui.QFontMetrics( font ).width( text ) + 3, 10 )
+
+		painter.setBrush( QtGui.QBrush( QtGui.QColor( 'lightgray' )))
+		painter.setPen( QtGui.QColor('lightgray'))
+		painter.drawEllipse( w-fw-2, h-fh-1, fw, fh )
+
+		painter.setFont( font )
+		painter.setPen( QtGui.QColor("#005555"))
+		painter.drawText( w-fw, h-2, text )
+		painter.end()
+
+		return QtGui.QIcon( pixmap )
+
+	def refresh( self ) :
+		self.table.clear()
+		self.table.setSortingEnabled(False)
+		for i in mailbox.messages :
+			item = SortedTreeWidgetItem( mailbox.messages[i] )
+			item.setData( 1, QtCore.Qt.UserRole, QtCore.QVariant(i))
+			score = float(mailbox.messages[i][0]) * 10
+			if score < 0 :	# ham -- go green
+				item.setBackgroundColor( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
+			else :				# spam -- go red
+				item.setBackgroundColor( 0, QtGui.QColor( 255, max(255 - score,0), max(255 - score,0) ) )
+			self.table.addTopLevelItem( item )
+		self.table.setSortingEnabled(True)
+
+	def strip_err( self, err ) :
+		if err.startswith( '-ERR ' ) :
+			return err[5:]
+
+	def reload( self ) :
+		for i in ( self.reload_button, self.preview_button, self.delete_button ) :
+			i.setEnabled( False )
+
+		tray.trayIcon.setIcon( getIcon( 'mail-send-receive.png' ) )
+
+		try :
+			mailbox.rescan()
+			err_msg = None
+		except poplib.error_proto, e :
+#			print 'POP3 error:', e
+			err_msg = self.strip_err( e[0] )
+		except socket.gaierror, (errno, errmsg) :
+#			print 'POP3 error:', errmsg
+			err_msg = errmsg
+		except socket.error, (errno, errmsg) :
+#			print 'POP3 error:', errmsg
+			err_msg = errmsg
+
+		if err_msg :
+			tray.setToolTip( err_msg )
+			tray.trayIcon.showMessage( 'POP3 error', err_msg )
+			tray.trayIcon.setIcon( getIcon( 'mail-mark-important.png' ) )
+		else :
+				if mailbox.new_mail :	# new mail arrived?
+#					tray.trayIcon.setIcon( self.create_icon('mail-mark-unread.png', len( mailbox.messages ) ) )
+					tray.trayIcon.showMessage( 'New mail', "you've got %d new messages" % mailbox.new_mail )
+#				else :
+#					tray.trayIcon.setIcon( self.create_icon('mail.png', len( mailbox.messages ) ) )
+
+				tray.trayIcon.setIcon( self.create_icon('mail.png', len( mailbox.messages ) ) )
+
+		self.refresh()
+
+		self.onSelectionChange()		# can't delete if no UIDL support
+		self.reload_button.setEnabled( True )		# always on
+
+		if not len(mailbox.uidl) :
+			self.delete_button.setToolTip( "requires server with UIDL support" )
+		else :
+			self.delete_button.setToolTip( '' )
+
+	def auto_reload( self ) :
+		self.reload()
+		interval = int(settings.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
+		QtCore.QTimer.singleShot( interval * 60000, self.auto_reload ) # 60000 = 1 min
+
+	def onDelete( self ) :
+#		print 'delete'
+		items = self.table.selectedItems()
+		if len(mailbox.uidl) == 0 or len(items) == 0 :
+			return
+
+		reply = QtGui.QMessageBox.question(self, 'PopTray Minus - Delete Messages',
+				'Do you really want to delete %d messages?' % len(items),
+				QtGui.QMessageBox.Yes | QtGui.QMessageBox.No )
+		if reply != QtGui.QMessageBox.Yes:
+			return
+
+#		for i in items :
+#			print i.data( 1, QtCore.Qt.UserRole ).toString()
+		mailbox.killed = set( str( i.data( 1, QtCore.Qt.UserRole ).toString()) for i in items )
+#		print mailbox.killed
+
+		self.reload()
+		mailbox.killed = set()
+
+	def onPreview( self ) :
+#		print 'preview',
+		item = self.table.currentItem()
+		item_id = str(item.data( 1, QtCore.Qt.UserRole ).toString())
+#		print item_id
+		if item :
+			try :
+				text = mailbox.get_message( item_id )
+			except Exception, e :
+				text = '<font color=red>error : ' + str( e ) + '</font>'
+			BrowserForm( self, 'PopTray - Preview', text ).show()
+
+	def onReload( self ) :
+#		print 'reload'
+		self.reload()
+
+	def updatePreviewDelete( self, preview, delete ) :
+		items = self.table.selectedItems()
+		enabled = len(mailbox.uidl) and self.reload_button.isEnabled()
+		preview.setEnabled( enabled and len(items) == 1 )
+		delete.setEnabled( enabled and len(items) )
+
+	def onSelectionChange( self ) :
+		self.updatePreviewDelete( self.preview_button, self.delete_button )
+
+	def onContext( self, point ) :
+#		print 'context!', point
+		previewAction = QtGui.QAction( getIcon('preview.png'), self.tr('Preview'), self )
+		QtCore.QObject.connect( previewAction, QtCore.SIGNAL("triggered()"), self.onPreview )
+		deleteAction = QtGui.QAction( getIcon('delete.png'), self.tr('Delete'), self )
+		QtCore.QObject.connect( deleteAction, QtCore.SIGNAL("triggered()"), self.onDelete )
+
+		self.updatePreviewDelete( previewAction, deleteAction )
+
+		offset = QtCore.QPoint( 3, 26 )
+#		print offset, point+offset
+		contextMenu = QtGui.QMenu(self)
+		contextMenu.addAction( previewAction )
+		contextMenu.addSeparator()
+		contextMenu.addAction( deleteAction )
+		contextMenu.exec_( self.table.mapToGlobal( point + offset ))
+
+
+class BrowserForm(QtGui.QDialog):
+
+	def __init__(self, parent=None, title = '', text=''):
+		super(BrowserForm, self).__init__(parent)
+#		self.setAttribute(QtCore.Qt.WA_GroupLeader)
+		self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+		browser = QtGui.QTextBrowser()
+		browser.setOpenExternalLinks(True)
+		browser.setText( text )
+		layout = QtGui.QVBoxLayout()
+		layout.setMargin(0)
+		layout.addWidget(browser)
+		self.setLayout(layout)
+		self.resize(500, 500)
+		QtGui.QShortcut(QtGui.QKeySequence("Escape"), self, self.close)
+		self.setWindowTitle( title )
+
+class Mailbox :
+	def __init__( self ) :
+		self.new_mail = 0
+		self.messages = {}
+		self.killed = set()
+		self.uidl = {}
+
+	def decode_stuff( self, stuff ) :
+		lines = list()
+		for (data, encoding) in email.Header.decode_header( stuff ) :
+			if encoding :
+				data = unicode( data,  encoding )
+			lines.append( data )
+		return ' '.join( lines )
+
+	def check_error( self, data ) :
+		if not data[0].startswith( '+OK ' ) :
+			raise poplib.error_proto( (data[0], ) )
+
+	def is_blacklisted( self, msg_from, msg_to, msg_subj ) :
+			for name in self.black_from_contains :
+				if msg_from.lower().find( name.lower() ) != -1 :
+					return True
+			for name in self.black_to_contains :
+				if msg_to.lower().find( name.lower() ) != -1 :
+					return True
+			return False
+
+	def load_messages( self, mbox, nums ) :
+		self.new_mail = 0
+		self.black_from_contains = loadConfigList( 'black_from_contains' )
+		self.black_to_contains = loadConfigList( 'black_to_contains' )
+		for i in nums :
+			tray.setToolTip( 'processing message %d of %d' % (i, len(nums)) )
+			if debug :
+				print '-' * 80
+			header = mbox.top( i, 0)[1]
+			msg = email.message_from_string( '\n'.join( header ) )
+
+			msg_from = self.decode_stuff( msg['from'] )
+			msg_to = ' '.join( self.decode_stuff( msg['to'] ) .split() )
+			msg_subj = self.decode_stuff( msg['subject'] )
+
+			try :
+				msg_date = email.Utils.parsedate_tz( msg['date'] )
+				msg_date = datetime.datetime.fromtimestamp( email.Utils.mktime_tz( msg_date ) ).strftime( "%Y-%m-%d %H:%M:%S" )
+			except :
+				msg_date = 'None'
+
+			msg_score = msg['x-spam-score']
+			try :
+				msg_score = msg_score.split()[0]
+			except :
+				msg_score = 0
+
+			if debug :
+				print 'From: %s\nTo  : %s\nSubj: %s\nDate: %s' % (msg_from,  msg_to,  msg_subj, msg_date)
+				print 'Score:', msg['X-SPAM-SCORE']
+
+			app.processEvents()
+
+			if self.is_blacklisted( msg_from, msg_to, msg_subj ) :
+				if debug :
+					print '**DELETED**'
+				mbox.dele( i )
+				continue
+
+			msg_score = float( msg_score ) / 10.0
+
+			if len(self.uidl) :
+				msg_id = self.uidl[i]
+			else :
+				msg_id = i
+
+			if msg_id in self.killed :
+				if debug :
+					print '**KILLED**'
+				mbox.dele( i )
+				continue
+
+			self.new_mail += 1
+			self.messages[msg_id] = [ '%5.1f' % msg_score, msg_from, msg_to, msg_date, msg_subj ]
+
+	def open_mbox( self ) :
+		host = str(settings.value( 'host' ).toString())
+		user = str(settings.value( 'user' ).toString())
+		passwd = str(settings.value( 'pass' ).toString())
+
+		mbox = poplib.POP3(host)
+		mbox.user(user)
+		mbox.pass_(passwd)
+
+		return mbox
+
+	def get_uidl( self, mbox ) :
+		uidl = mbox.uidl()
+#		print uidl
+		try :
+			self.check_error( uidl )
+			uidl = uidl[1]
+		except :
+			uidl = []
+#		print uidl
+		return uidl
+
+	def get_message( self, msg_id ) :
+		mbox = self.open_mbox()
+		uidl = self.get_uidl( mbox )
+		if len(uidl) :
+			num_to_uidl = dict( u.split() for u in uidl )
+			num_to_uidl = dict( (int(n),num_to_uidl[n]) for n in num_to_uidl )
+			uidl_to_num = dict( (num_to_uidl[n],n) for n in num_to_uidl )
+
+			data = mbox.top( uidl_to_num[msg_id], 20 )
+			if data[0].startswith( '+OK ' ) :
+				text = '\n'.join( data[1] )
+			else :
+				text = data[0]
+		else :
+			text = 'no such message'
+		mbox.quit()
+		return text
+
+	def rescan( self ) :
+		app.processEvents()		# just in case
+
+		mbox = self.open_mbox()
+		if debug :
+			print "%d emails, %d bytes" % mbox.stat(), datetime.datetime.now().strftime( "%F %T" )
+#		print mbox.list()
+
+		uidl = self.get_uidl( mbox )
+
+		if len(uidl) :
+			num_to_uidl = dict( u.split() for u in uidl )
+			num_to_uidl = dict( (int(n),num_to_uidl[n]) for n in num_to_uidl )
+			uidl_to_num = dict( (num_to_uidl[n],n) for n in num_to_uidl )
+#			print num_to_uidl
+#			print uidl_to_num
+
+			old_messages = set( n for n in self.messages )
+#			print old_messages
+
+			new_messages = set( n for n in uidl_to_num )
+#			print new_messages
+
+			gone = old_messages - new_messages
+			came = new_messages - old_messages
+#			print 'gone :', gone
+#			print 'came :', came
+#			print 'kill : ', self.killed
+
+#			self.new_mail = len(came)
+
+			for i in gone | self.killed :
+				del self.messages[i]
+
+			nums = sorted( list( int(uidl_to_num[i]) for i in came | self.killed ) )
+			if len(nums) :
+				if debug :
+					print 'loading: ', nums
+
+			self.uidl = num_to_uidl
+		else :
+			self.messages = {}
+			nums = range( 1, mbox.stat()[0] + 1 )
+
+		self.load_messages( mbox, nums )
+
+		if debug :
+			print '-' * 80
+		mbox.quit()
+
+		host = str(settings.value( 'host' ).toString())
+		user = str(settings.value( 'user' ).toString())
+		date = datetime.datetime.now().strftime( "%F %R" )
+
+		tray.setToolTip( "%d emails, %d new\n%s@%s\n%s" % (len(self.messages), self.new_mail, user, host, date) )
+
+PIXMAPS['mail.png'] = ICONS['mail.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAABHNCSVQICAgIfAhkiAAAAAlwSFlz\
+AAAN1wAADdcBQiibeAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAMBSURB\
+VDiN7ZVNixxFGICf+ujq6oy72XF23B0zOxlNDIuiSYh6D1H/hIhXL4IgAX+BYjQEbxIUDZ5EPBhn\
+d3MKyQ8QEUxcQeMpamQ/Oq6ZmZ7uqvLQs70ziydlb770S9dbdD/9flaLEAIHIfJAqAcJ1gAX3n/n\
+RWPM5TzP2/8JpqPfiiJ/7fybb61qAGPM5VdefrXbaMzjvZ96uKxBIIRACJM21b4QEMeWzc2NpSuf\
+XfkIeFQC5HnejmPL+voPCCEA8N7jvcN7h3MO5/bbBUVREELAGMut27dJkhreu0fefe9tW+XYWsvs\
+4cPcuHm9gpeAPeieXX5ASom1CTduXmd2ZgYTmyrSCiylpDnfpNPpsrrWQ2uNlKryfBLovUPriCQ5\
+xNq1FRYWWtQfrgNUTk11hZSSVqvF0aNdeqtXiaIIrfUU0DmHMTHWJqyu9VhstVhcXCih+8G7M1K4\
+AiUlS0tLtI90+Lr3FcbEGBOP4R5rkwrabDZpH2mjlKJwxVTRxx6X1S2KooQrRaNRJ6kl9FauYq1l\
+bq7O3FwdaxPWrq0QxRGNRgOtS6gbF3J3knXVVgScywkBBsM+W1sbvHD2Je7+epcvvvwcpfS4Wxyn\
+T53i8ceO8+1336CNwsbJFHQKTAgUrmCYZdxPU04+c4YsG3IosZw7e656SQiBEII0TTl98gy31r/H\
+1zyRMUyeOnKPG8hGGdlwwPKJJxkM+gyGfYQQSCmQSiKUQEhBEIGAZzvd5qnlp8mLgmyY/bPHIQTy\
+UU63c4zNdINsOCCM9wmh9CYEAoHyKkP/86+UY90n+OnOj9NgIYS4eOnC7w/6D9qddpfRKGOmNstM\
+bXYisDB127dklGecOL5Mej9FCLF16eIHXgNqZ2fn9U8+/fhDKeW8c45/I0opnPPbabr9xr17fygx\
+kZLoueeffWgwGKgiL1Se59o5p5z3KngvQwhVPYQQXkjplZROKeWU1s6YqLjz8y/9fr+fAbmYzIso\
+x0YCaqxyn+5mIQAecBPqAV91z/+/pl35G6NHq+ma/Sm3AAAAAElFTkSuQmCC\
+"""
+
+ICONS['mail_q_16x16.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAAAZiS0dEAP8A\
+AAAAMyd88wAAAAlwSFlzAAAN1wAADdcBQiibeAAAAAd0SU1FB9kDFgotNikw33QAAAIySURBVDjL\
+pZNfS1RRFMV/55x77p2/kKHljDNlgURRCT2JgSIEgRW9VPQFAj9JINUXSBPqMfpjjaNFX6AXI00i\
+BKVMMAmVHGacufece3oYsbGXCPfL3mxYi7U2awvnHAcpyQHLu/9g9JKnvbEoigr/A9Rar5rI3PGc\
+c09u3rid68p3Ya1FyqaopjWHc62z2wX7bG1tdo9PPHwsjTW5bCbL23dvUEoRxzFRFBJFIWEY0mjU\
+aTTq1Os7xHGM1j6fFubRWmOMyUspJelMmkK+QHmmhFIKIQTGGIyJ9rrneQRBgqnpEja2BIkEUsrm\
+EaUQFIoFuvJFyjMltPZRSmGMwVqD7wckEimmpkvkOnN05fNI0bTqNf2CUopisUC9UaM09YprV6/j\
++wHMziLLZdany/T7Pn5fH/bKMG5gsJXAYa2h0ahjY8P5c728mHzGoaVleiZfc2RujqPbFQBsWxvR\
+8hKkMi0EOGq1GptbG1zsG2Bnp8rQ4BD65wbJtR+o7QoIAYByjvjkCVhc3K8giiLOnumlUvmFjS1C\
+CtT3VeTKyh4Y50AIPK2x375CoJBa6/VarcqxYjdhFBIkkqSSaVLJNLqzE9rb/6Rnl0h0dBBmMnie\
+t+5Za0ceTYyPKSXbjDH70nb8y6Lo97XIg2hVsOZr9/7zwnZ8qmdEOOcYvXdXAMHfcb38fDJz+uP8\
+sA7DW8K5CwBOiA+R7z+1Sr1MVasV8c9vFCILHAayu5sKsIlzFQBx0Hf+DT6l/a1iGGsaAAAAAElF\
+TkSuQmCC\
+"""
+
+ICONS['preview.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAAAXNSR0IArs4c6QAAAAZiS0dEALIA\
+xQDsrZwa8wAAAAlwSFlzAAAN1wAADdcBQiibeAAAAAd0SU1FB9kDEg0jGg9GH8sAAALjSURBVDjL\
+pZRLa1NRFIW/fZM2qdZG0bY0rVSrgk9KrYriwFEdaYs4EEX0V/gnhIJTQXw2FlFq/QEdOBFHTsQH\
++EBp6aTFquRhcs8528F95CZNqOAm5OzkhpW111pni6oC8OTZ492plDdtjZ1USAGARi9EpOyJfFHV\
+N9a5l6CFK5eu1WhTEgE/nZudGx87fiGfHwaR4GEADYCzDmMqlEpFVlZXqu/evf3lnLuhMHP18nXX\
+DOxFjTFmcveuPfi1Cn61jF8tUwtPv1qmVK5Q+VMmk80w0J/PTE1e7Dt48PBtEd4/Ktzb3hbYOU1J\
+yLRdFSuGH2u/WFz+zsePHxgbHc+eOnF6n3jewoOZu10tgSNJ2lW2U+jblqN/Ry9dm7fw8/caACMj\
+e70D+w8d8kSe3394x2sB7PjX6khnUFf//djo0fTAwNAZp3oy+i4dA7uAsbEa2hamIrYwcaqQ7uik\
+MDtDqVjk/LkphvJDmcWlbxPAq0aNQyl8K/hGqRnwTdD7VvBt/cRL0de3g+FdO9nS083z+Tlyua3i\
+iTe1nnEEbOKANQWOuM9me+jK9tCT28nQ8CjVyirOOXzfP9JWCt8CsZHh6BJ9lvjCEAsmpDu3Mzi4\
+DetcugVj18Q4gq3DKEpzIBWIfI/INQBHGtds3br4OtchwgkSwJrsWwDHqTCayEDyncQ1TzKvz5SM\
+bIN5vrH4JpmsxJ/E1DVcMokHnjZMvU5jY0PzUFAJvYqA6hJoYhZBwckGGqvG5sWAEmmtsbyq0QIM\
+TJAwNe01FqjZgEcybaEqaKNvoIoKeLKBxsGVrveSMEckWvoS9hKbl4o0biUFqEVJeQLiBSytBVEN\
+xnYhliqq4FDUBRI5jcnYBmARyUzfurmwtPT17MSxfWy0l5tLVfn85RPGmAURyahqNS0iHtBbeDRb\
+KJcq3d3dm06qJtZp8g6v29saGimuWCy9np9/UQB6RWRZVBURyQB5oIP/Kx9YVtXqX5fUrbIhcUFp\
+AAAAAElFTkSuQmCC\
+"""
+
+ICONS['delete.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAABGdBTUEAANbY1E9YMgAAABl0RVh0\
+U29mdHdhcmUAQWRvYmUgSW1hZ2VSZWFkeXHJZTwAAALRSURBVDjLfZVLaFNBFIaT5tEISSgEWxcF\
+Ne5au1CysdqFj121vhZ2KS1CSVftzo0KouC6qxSEiitRREUXCopV8QEasFYjraLFtpJqlb40zcPj\
+f27OZOZO0hY+5t7OP39mzmOuh4g8JvjzAX6oBwFQZ2sMbZ2hDfLaypwh8ooRUX9/XhZsBGHgr2Hq\
+d7QDA0rbCCLi4TWFjum/oSEqdXdToSxmNoMoz1dpUykq9fRQKRhU2jhocObN45dgWuztpUJLC+Xw\
+/l2bb1XmyrQ0PEzFZJIKbW20jPdxrY07WjGm1WQyv4qd5lpb6S/e/4AFMO1eEOPnAkyhr2gnwWVw\
+1uMpirZJGYf4H0tgUUbFL7c55WGag+kKTJfEdAQc15p20KyMgxJ8+gzmxPC3jMxiIkErg4O03NdH\
+CzDluYzs9Jg27QI7HC8jxmFJFH0EMyArP8L8iMVoHvH8GY877+9AChzRpti0Z5d4hO3yiUqiHHMO\
+wWwN3ovpYbdpu5Fkv12bAZngRNEMjv8NO53Cs8lLcEGbngAdlWqQsqzVTQGV/Sxi+hXH/4RnEw7D\
+TW3cCbbLmkBV59nFP4/sTyNRE4hpRhKl+ADS4Ik2X99Ymc7BdAollUH2x8TgAXgF3oIxGd+AUbsx\
+7FCo3s/C9AtMx2HKu7oPLoHT4Cp4LoZpGfnHHlV3qN/V0rPo/UmYpmHKCboLzoMDRoPcA8/AC0ki\
+j4/BNffdEq609ARuqQwulNdIFi+8Dc6B/e7sdypzNnsqP3JLNpDULd3oaunRUIgeYrwOzoB97jrt\
+kCQxdEfCdANcBIe0drfd0k08cUXiube6+NUlFFN1PlK+eOig1h4FCfMS8knQt7HgpD5Sl7SpfW1W\
+OvSU1rLpHvGI2qXWoMzlSDvBljUu+qjMKW1C1uqL3vo08YJNTpzK4Yms82mKiKZZ1qhTeWt1nk8+\
+jhvsD+Qa2qBo603tfz2pl5YC8SscAAAAAElFTkSuQmCC\
+"""
+
+ICONS['reload.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAABHNCSVQICAgIfAhkiAAAABl0RVh0\
+U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAS+SURBVDiNtZVLbFRVGMf/3zn3zp1Hp9OW\
+Pulr2pJCCkQ0GgSMMfUBWNCYCEHDwhXgUiU8ZKEbHg0mJJpAJGhightRNECFheElVkNrLAkQBNpm\
+Wul7Ou+Ze+feez43U2ipCzbe5L+55zu/8z/f+Z8cYmb8H594kiLafEo+SV3T+kPh+nVHygCA/stx\
+S8fBVpDYxUTtrLgGBJ2ANAgTzLioXPdUxWT51d7ebfbMnOY3D1QpV3QLdtsHuvZF5oCJQM0dnSeY\
+sMXnD3o8fp8mpQaPR4MmAHZdWJblplPJtJnNayDq9GdyRywfhCu8PczcKiQ19p/ZPaTNdtrc0fm1\
+0PRNoYpKv1IKrFzomoBHEzB0DbomIEWR1GsrQkSMSGR87xTUToBGWsI1jaNjU2kr6ygAeAhu6ji4\
+Ukr5tr84FIhPjivlukIKibjrMDMcn1fPlpWV+KuqFuiKgZzpYumSBh+rWt9UNBlc0dZAP3RNOpYO\
+NefwBIkdRDKQjkW5orKSGluazbKa6u8Gz+0WTFxl5Z3XRsemTvfd+DubjCe5rjKIaNLEVCqPlnA1\
+6VKACSQdmgtm0FrHsWnxktZY25Kmv/J5JwaowwAQObcnNnB21/WBs7u2sHLWDERGen7vuZ2pCnlQ\
+VxFE980RaFJAKTUfDIIRCoUetDTXfhnye0+CxF2XPbHHEzPY9XGfctVe27I1n1fH2HQGAGB4JBzX\
+JWnQ3B4zOFtaEvw86POezeeNKbbom2B9ZXJ+FDuXC4EzL65qM0qLA6gsC+KF5bXw6BJgoqwt5oLD\
+abPpclW/uvTeVgUA2NY6L9/hdQdqoIkLxPBf7r5pqUJUZxLLzB7Nl1TArAvSvKFzksFF82gAiJGC\
+oFel67/jGNO+/6oBAM6zEfn50wlm8KMcM5e8/2675tEftT1rOfj+/HUrGst9GOnafaPw2wKAZ7cf\
+14FS/+plT5sLgvnSa3/2re4fGD7OjPLHekxkGBI/Xr0PZmD9yjC6e+7m4sns0cj5PScfd6epQJU0\
+1DHDl/opYaqKqenEdpLSnRl/FDcCCATTdtG8MAQpCEPjMYBo+aK1++vn7Vui2HXVqkQqu7Wn79bO\
+eDweBvPAw4VndYiEIKxZthD3/onjznAc72x83ne5597L9/of3GnacOgLUtwLKYeKQiWabng/8wi3\
+5Nffel+ybYelpttOXp2YByYAggiCXaxqq0Yq5+DWYBTLWutka7jaPzg88VEslcklE1mRSyUDViYJ\
+3TDgDQTgkxrFJ8ZNMs1v5ztWRMOj03z6Qm+CicWKxXXairawfzRuIm+7qKgo04KhUJBrGa5i5CwH\
+WctBOmNiamw0Dcf9YPDSJ+ZDo8wMIpLh1w/Yhq6lo5Gejcn+i2OlSze9EVzQsKOxvry2vKxUDxQF\
+hKZryORsZEwbybSJaDSmErFE3s1EO4evHD4KwARgMnN+BuwNrz8Yy8Xubx7/46tbAHwFeUta2p8q\
+anhui+YtfgYkDF0K23aVZGYoO3MtM9J3bPp21w0AuYKyzJydAVPDK/veGvpl/xUAXgDGLOkFSWmE\
+dF/VojI7MRmzEkMxAPlCrq0CNAXAYmae9zQRkZwFm5EGQAJgAG5BdkF5AA4zu7M5/wJYFUuTpL+Z\
+2wAAAABJRU5ErkJggg==\
+"""
+
+ICONS['gtk-quit.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABmJLR0QA/wD/AP+gvaeTAAAACXBI\
+WXMAAAsTAAALEwEAmpwYAAAAB3RJTUUH1goUDSQ2q/JqlwAAAlZJREFUOMulkz9PU2EUxn/vvbe3\
+rf2DpVyQ2MZYtKKRhNEPgH9CgokLAT8ADsYQHcQPwOCgMW4kDjIpCQtKXJRRBBaDkUGCbQcFsSmk\
+FNpLafseBwgKNTj4Jmd5z5PfOU9yHiUi/M+zDn8opcxoNHo5mUzGRATDMFBKobVGa02tphGB1dUf\
+m8vL398gInXV29v/rFoVyeU2ZG2tIOvrBcnl8pLN5mVlJSeFwo4MDz+cBYJ/20B1d19nZuYjIyNP\
+8Pv9WNaubGzsJSLCxMQ7XHenClh1ABGRrp4btZoIbW0J+vr78Nk+AEZHn6PUvg4A4zDAVMqTyOWi\
+lVIJfzCIE20i6uxWPB7HcZyjAQInBzJLV9WLURDB8HjYG0ok0khjY/RowCnweR0n0L5TpCuVolLT\
+VLTmw/R75uZmCQSOHdAbAK+93sl0PD7/LRabH4/FXgVMU/l8fuKZDMXHj9BKUdjaYuDWwL4FrfXv\
+O/A0NFyK9PQ0VbTmnGFQ3diglkrhsW2CU1PUDJNrQ/dJpzJYpnXAggVgFIvl6vQ02nUpuy6qXMas\
+VGB7G7taZTlynDjQfr6dUnGzHlB2XdlaWEBrjQ2E9xo28Lmjg+ztO7ipr7Q4DpFIZM/CH4CbIg9M\
+kQRQboATn2AwAMZiZyeZoSHakmextebMhYuk02kAwuGQB9BKRFBKmYAJEIQrBcuafCuyc6+1dcZo\
+bl4Keb21UCisbNvezufzXqWM09nsz+XFxS9P63LgVSpxNxwebzXNQSB6uA8ooAVoBfzqcJyVUjYQ\
+Akoi4v4rzr8AOtoq54WTN98AAAAASUVORK5CYII=\
+"""
+
+ICONS['gtk-about.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAADYUlEQVR4nGJkQALKAZOZGBgZLQV5\
+OCKE+DmtebnYpP79+8/w8cvPZ+8//zj66duPFQz/GY/f3ZDzD6YHAAAA//9ihDFUAqeICvNx1qsp\
+CCdLCHJzMLMwMfz9+5/hz99/DH/+/mX49uMPw+v3X388fvlp7pdvvxpvr895zcDAwAAAAAD//wBB\
+AL7/AQAAAAAfTpEXIBgQnDEnGEwJCAQA+vv+AC4eBgAsHwwAAAAAANDe8gDH2fQAAP8BAPX3+QDd\
+5e+06/D3ZN+xbekAAAD//wBBAL7/AR1LkAMWEguPOS0cbQkGBAD5/P0A//8AAG9RJAAPDw8AAAAA\
+APHx8QCEpdUA/P3+AP//AAD4+PwA2uPtk/P1+nEAAAD//wTBuQ2AMBAEwD0fEBBtQERGF67I/SI5\
+R/QASKB7mCnTqHVb2VQF92swT3gE+vmAJEhiPy54JNwTnzmKChbObVCpPwAAAP//RNDRCYAgFIbR\
+T0iuldF47hmuEDSGW0Sg9/exM8JZjs3Kmc3er/+bgvo0rrvhApeQBAGCoA9nX6OlFMsEAAD//zzQ\
+UQ2AUAhA0esmfshMYJUXwSZWsIyhzMIYAv55Ipx5W5cBExH1r57HjqoiIgCYGdf94J54JPEmWUV3\
+jw8AAP//YuFgZ5X6/fcvw/9/DAxMTJBI6V3/iGFivg0DCwsLAwMDA8OXL18Ybtx/C9XEAHENAwMD\
+IyOjFAAAAP//Yvn77x/Dv38MDL///GP49u0nw7vPPxg+fPnJwMHBwcDDwwP31e8/f5FinpGBEZoA\
+AAAAAP//Yvn67deztx++ib9895Xh05efDH/+/WNgYmRk+PMHKUwgtjFgAc8AAAAA//9i+fDlx5F3\
+n38Y/v7zl4GZiYmBhZkJm0Jc4AgAAAD//2L68/f/yr///v1kYWZiwG4JTvCTgYFhJQAAAP//YmJk\
+ZDjBxMg4C1lmc5szPAAZGBgYWFhYGDa3OaMbMIuBgeEEAAAA//9iZGBgYFAJnCLOwMAwh4GBwYdI\
+27cwMDCk3Fmf8xIAAAD//2JiYGBguLM+5yUDA0MSAwPDVAYGhh94NP6AqkmC6mEAAAAA//9C8bVK\
+4BQmBgYGSwYGhggGBgZrBgYGKajUMwYGhqMMDAwrGBgYjt9Zj8jOAAAAAP//AwBqPBucJP8EOQAA\
+AABJRU5ErkJggg==\
+"""
+
+ICONS['mail-send-receive.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAABmJLR0QA/wD/AP+gvaeTAAAAB3RJ\
+TUUH1wceFBMQpn4g0QAAA5tJREFUOI29lV1oHFUUx393PnZXstrohuQl9SGUSBtIGtMiZaMWfTC4\
+MUosraKyhWLBL0pRmi3oQ1qKbaSIYkFiqRuKYtb2wdjSQl+sNI0aCyWYgKC0SAS1mmzTbnY+7sz1\
+YWenk00q9MUDl/9/7pz7P+eee+aO4A6sbzimaufGdjpiJV/jToQBDr4wFvLcZ3239TMAhg4P9eqC\
+46506/9L9CKDSGVxvvgRj9a/Xgk0dCDchWmYRU/x0p4395wyADRN5Xe+/Gp9si6JUhW/KFa44uKn\
+g8uC7XpjNwCJxF3MF+frj+U/yQMNBoB0ZcrQDaampmhvb8f3fXzfRynFlnwyFDH1OLqI4ykHXcQx\
+9Tjbjt/a5BcvFpGuTIWlAIjH4zQ0NPD1qTGe6u3D9z183wPg0LazKMMB4Io1gaMWuWp9x/7nvgRA\
+yBgDoz3EYrEwiFYlQggaGxtpbW3lWP4ohmGiaRrvPHaCgdEecHVm7cvMlM4AMFM6w6x9GVydgdEe\
+3n78KxRqubBSCiEEq1ffT2fHgwwf/ZjFuQnsC33s7dpPrpChWeuiI9mPhk5Hsp9mrYtcIUNu80nW\
+NqWJ9t2SdpOei6ZptLS0YC/8wE9nN5POKsZHBAOd75IrZDi49TTNqfXg6uQKGd56uMC6pm6kJyEi\
+vSRjKSWeJykXJ/CuvkI6q5DlS6SzCjW9l8H0e+QKGeaLc+QKGV7bMEJbUxrpuUgpb1MKFNKTXP/j\
+PL9+8yTprKJ8bR8LVzZRvraPdFZRmtzFI84THDq9nQO952gQLZRKN8OEqi26tBRKsfDnt/w2/nQo\
+Wv5rEPADhHRWwYjg2U0nWJVo4971KaZnpqi7O4lpmKBWPDxCUVm+hJnMkEgFzZ/ajZnMhGX5fWIL\
+PvDP/N+0rWvHsW1s2yZ6kRi3hCvT4yOVA9D0BBv7z2HPDxO75xkmT3bje1a48MbNIkopFm4UaV2z\
+lp9/mV5WCmEYxpz05H3prMJ1HRQw+XkclIfQ6kB5+J7Fxuctll5vlSfbsXhgTRuLiyUMQ58DhAFQ\
+tpwdR458mPd8b1V1SXcjy+z9Dw4vn4yYrunXS461A1jS0wkgFqB5Ic/sQ1t/DF9+X9hA93Y6AT8Y\
+DuAFaANWwK2wFIBJ5SBF4KxXxWpMBPuXgZ8b4SLQiAGuiAgbK2B0VDvID8Siw63F2s9br0Et4NUE\
+CDJWQZZ+gNUAVc6K/6uIkFbDqxlXxaP8/7F/ASt5oTMft2T0AAAAAElFTkSuQmCC\
+"""
+
+ICONS['mail-mark-important.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAABYAAAAWCAYAAADEtGw7AAAABmJLR0QA/wD/AP+gvaeTAAAAB3RJ\
+TUUH1wgQABkcLIdvPgAAAt9JREFUOI3tlM1rXFUYxn/n3HPv3EmmJjOTxoZUJzPpR9pSlVpEceMi\
+gpT8GbUL/4Buuugqm0A3QldFKJTSXTOT0EUl7rqSVqQ0Kiq4qQtx4tQUM/fjfLi4d2buNBGk2J0v\
+9+U9H5fnfc9zzvvA//aqTfwXIA/Bvbim1q6trXiCW6lOp18a+fIVTl29CtaCtXy/uoqS0t289Oln\
+05XJCs5liYsxG7t8PNobrAFsX74CSULSbhOsrAAgdarrylM82X6CEALnHNZajDFYm7kxBmNsYa7R\
+WuOcIwzLWZo4HosSoFQqcXhmhq2vtpBSAq4AaLDWvjA3eJ6kXJ7g/pf3swPkgBSBhRDU6zMstlps\
+bLZRykdKmVdoxwCtNSjlE4YTdDbWWVhoZJUmyf6KnXMIIXj9yBEWF4/T2VzH9wOU8sdAjTEEQYkw\
+LNPZXGeh2WR2djarNAceRDm4WG1SpJQcnZ+n0WjS3rhLEJQIgmBYeRiWCcMy7Y27zM+/wdzcXE7d\
+iAJXBHbOobXGGI2nPGq1aSqvHaKzuU4YlqlW61Sr9WGlk5UKtVoV5Xlok45RMEig8oeDNhoc9Pt7\
+9Ho7LH/0MU9/fcrtO7fwfR+ANE354P0PaTVbfPPt1/jKIyiVhhTIRmOYQOUPFqM1URKz++cz3j77\
+LlEUMTlR5sInF/b1Q6+3w7l33mP7u8dMHqoA8OO9e2P/5FRAFEdE/T5LJ86w198jivdAiKE7kfWt\
+Ayyw0+ty5vRbJHFM9ZefOJvEbK2tch7EeRBqxHFKa+EYv3d/I0njrNPyrA5H9mXdN+i63efPOHHs\
+FI+EoAcsM9INpZT6Qxtde/NokzRNmJqq5odx+6TFHTCLkwgg04okwXW7/HDjBmr3+V+Xrl///Atj\
+zdQ+Mv+lLQPEMUmng7e0BGSyKckuUQFewWXugpG8Fmm2gAHMQ9g9efEirtvFdrv8/ODBgXosCoD/\
+BFwEdwfp8SuzvwEMp5WPiCBWzAAAAABJRU5ErkJggg==\
+"""
+
+ICONS['properties.png'] = """\
+iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAADPElEQVR4nGIUFRW1SE5OTmRjY2Nm\
+YGBg+P//PwMTExPjmzdvmJcuXbriw4cPOxjwAAAAAAD//2KwtbUt/o8FfPny5f+2bdteysnJ+eDT\
+DwAAAP//Yvr//z8zAwMDw9+/fxn+/v3L8Pv3b4Zfv34xvH37hkFFRVVs165d8/EZAgAAAP//VMqx\
+AQAQDADBZwZlyuxjRBvEKEHPKtFoXH0ZCAD3gftgzkVEAImzNyJSrFtT1fr+5wIAAP//ggtoa2sx\
+aOtoMWhpaTL8/fuXgZOLi+H3n18Mvb29DGfPnhUpLi5eKiQk5ItuAAAAAP//YoExrl69huE8OTk5\
+ho8fPzF8/vyJQUFBkVtWVtbg3bt3G5HVAAAAAP//XM2hFQAgCEXRZ2YDqnb2H4wjRb7N4AL3PmCt\
+yQCEUIvTTdUmIshM3B0z059cAAAA//9iYWBgZGBgYGC4c+cu1kCS5vjNIHZtLQPX5sMM2+RO1TLJ\
+MXgwMDBsZWBgWMq3guEBAAAA//9iYWSExL2crAwkNBn+M/z//5/h37//DAxvHzGwbetg4FE1YGA0\
+9WD49eokCwMDi+X/H38sGX4zaH2KYKgGAAAA//9iYfj/n+Hv3z8Mjx4/wbBd+ORiBmFVA4Z/dw8w\
+cJYcYPi1tZGBgfEPAyMHA8N/BoYoht8M1wAAAAD//yzSsQ2AIBAAwINEEysTeFjKuI29q9m5h4tg\
+oTPc5TG+A72F1kJvIaKotVifW8osxwXm/fzRSRPYXgAAAP//YvnP8J/hz58/DE+fPcV0wdMrDL+2\
+nmf4tbWRgc23noHNt4GBgYGB4dfmRgYGZgYGBgYGIwAAAAD//2L5//8/MxMjI4OysjJC53+IRf9l\
+9RgYXp1lYGCGamJgYGDzbWBg821g+LWxgeHnisZzAAAAAP//Yrl69eqD3Ly8ixwcHKzoBnh8+y/i\
+8JdBjJGZgYGBEWIIm28Dw/ceBwYmZQcGBgaGrQAAAAD//2JkYGDgZ2BgEGeAOQoJFGkySOdqMOQL\
+8zD4MLJCVLB51zP8/8fA8GtV4zIGBoZqAAAAAP//YsQa+UjgUwSDAgMDQzQDA4M3AwODEQMDwzkG\
+pHQAAAAA//8DAE7wA9YmrMDpAAAAAElFTkSuQmCC\
+"""
+
+ICONS['internet.png'] = """\
+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\
+//8DAJyYXGpYOXllAAAAAElFTkSuQmCC\
+"""
+
+def getIcon(name):
+	icon = ICONS.get(name)
+	if icon is None:
+		return QtGui.QIcon(name)
+	if isinstance(icon, basestring):
+		pixmap = QtGui.QPixmap()
+		pixmap.loadFromData(base64.b64decode(icon))
+		icon = QtGui.QIcon(pixmap)
+		ICONS[name] = icon
+	return icon
+
+def getPixmap(name):
+	image = PIXMAPS.get(name)
+	if image is None:
+		return QtGui.QPixmap(name)
+	if isinstance(image, basestring):
+		pixmap = QtGui.QPixmap()
+		pixmap.loadFromData(base64.b64decode(image))
+#		PIXMAPS[name] = image = pixmap
+		image = pixmap
+	return image
+
+def loadConfigList( name ) :
+	config_list = list()
+	size = settings.beginReadArray( name )
+	for i in range(size) :
+		settings.setArrayIndex(i)
+		config_list.append( str(settings.value("pattern").toString()) )
+	settings.endArray()
+	return config_list
+
+def saveConfigList( name, config_list ) :
+	settings.beginWriteArray( name );
+	for i,v in enumerate( config_list ) :
+		settings.setArrayIndex(i);
+		settings.setValue("pattern", QtCore.QVariant(v) );
+	settings.endArray();
+
+#def defaultConfig() :
+#	black_from_contains = (
+#		'mishajp@gmail.com',  'yurkanovanatalia@yandex.ru',
+#		'subscribe.exler.ru',  'uppsnappat@datormagazin.se'
+#		)
+#
+#	black_to_contains = (
+#		'dafvmcccpu@gaijin-life.info', 'gaijin-life.infogaijin@gaijin-life.info',
+#		'allofmp3@gaijin-life.info', 'dokin@gaijin-life.info'
+#		)
+#	saveConfigList( 'black_from_contains', black_from_contains )
+#	saveConfigList( 'black_to_contains', black_to_contains )
+
+#	strings = QtCore.QStringList( ('aaa', 'bbb', 'ccc' ) )
+#	settings.setValue( 'strings', QtCore.QVariant( strings ) )
+
+app = QtGui.QApplication(sys.argv)
+app.setOrganizationDomain('server-pro.com')
+app.setApplicationName('PopTray Minus')
+app.setWindowIcon(getIcon('mail_q_16x16.png'))
+
+debug = '-debug' in sys.argv
+
+app.setQuitOnLastWindowClosed( False )
+
+#settings = QtCore.QSettings( 'PopTray', 'poptray' )
+settings = QtCore.QSettings( os.path.expanduser("~") + '/.poptrayrc', QtCore.QSettings.NativeFormat )
+#settings.beginGroup("outputpanel");
+#settings.setValue("visible", QtCore.QVariant( False ) );
+#settings.endGroup();
+
+mailbox = Mailbox()
+form = MainForm()
+tray = sysTray()
+
+if not len(settings.allKeys()) :
+	if not ConfigForm().exec_() :
+		sys.exit()
+
+QtCore.QTimer.singleShot( 1000, form.auto_reload ) # 1 sec
+
+sys.exit( app.exec_() )

@@ -1,0 +1,25 @@
+= PopTray Minus - POP3 mailbox monitor with tray icon notifications =
+
+If you have recently moved from your Windows box and are looking
+for a Poptray replacement for Linux -- PopTray Minus might help.
+
+PopTray Minus is designed to:
+
+ * live happily in the tray
+ * regularly check message headers in my POP3 mailbox
+ * apply basic filters based on from/to/subj contents
+ * allow a sneak peek to preview the message body
+ * feature a delete button to manually remove unwanted messages
+
+You can find the latest versions of this software at:
+  http://server-pro.com/poptrayminus/
+
+== Requirements ==
+
+PopTray Minus requires the following to run:
+
+- Python
+- The PyQt4 bindings for Python
+- GNOME or KDE (with tray icons)
+- POP3 mailbox with UIDL support
+
