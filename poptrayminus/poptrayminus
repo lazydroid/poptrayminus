@@ -17,12 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# $Id: poptray.py 172 2010-01-03 04:52:00Z lenik $
+# $Id: poptray.py 176 2010-01-07 10:59:49Z lenik $
 
 import poplib,  email, base64, codecs, types
 import os, sys, datetime, socket, chardet
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 
 ICONS = {}
 PIXMAPS = {}
@@ -90,7 +90,7 @@ class sysTray(QtGui.QWidget):
 #		print 'about!'
 		BrowserForm(self, "PopTray Minus - About",
 u"""
-<h2>PopTray Minus v1.0</h2>
+<h2>PopTray Minus v1.1</h2>
 <h4>Copyright (c) 2009-2010 lenik terenin</h4>
 
 <p>If you're looking at this text, you have already figured out how
@@ -176,9 +176,10 @@ his book and code snippets.
 class SortedTreeWidgetItem( QtGui.QTreeWidgetItem ) :
 
 	def __lt__( self, other ) :
-		if not self.treeWidget().sortColumn() :
-			try :
-				return float(self.text(0)) < float(other.text(0))
+		column = self.treeWidget().sortColumn()
+		if column == 0 or column == 4  :
+			try :		# sort scores or sizes as floats
+				return float(self.text(column).split(' ')[0]) < float(other.text(column).split(' ')[0])
 			except:
 				pass	# not a float maybe
 		return QtGui.QTreeWidgetItem.__lt__( self, other )
@@ -204,7 +205,7 @@ class ConfigPage( QtGui.QWidget ) :
 		self.user_edit = QtGui.QLineEdit(self);
 		form_layout.setWidget( 4, QtGui.QFormLayout.FieldRole, self.user_edit);
 		self.pass_edit = QtGui.QLineEdit(self);
-		self.pass_edit.setEchoMode(QtGui.QLineEdit.Password);
+		self.pass_edit.setEchoMode(QtGui.QLineEdit.Password);	#*******************
 		form_layout.setWidget( 5, QtGui.QFormLayout.FieldRole, self.pass_edit);
 		self.interval_combo = QtGui.QComboBox(self);
 		form_layout.setWidget( 6, QtGui.QFormLayout.FieldRole, self.interval_combo);
@@ -255,7 +256,7 @@ class ConfigPage( QtGui.QWidget ) :
 		self.server_edit.setText( str(config.value( 'host' ).toString()) )
 		self.port_edit.setText( str(config.value( 'port', QtCore.QVariant('110') ).toString()) )
 		self.user_edit.setText( str(config.value( 'user' ).toString()) )
-		self.pass_edit.setText( str(config.value( 'pass' ).toString()) )
+		self.pass_edit.setText( base64.b64decode( str(config.value( 'passwd' ).toString()) ) )
 
 		self.black_from.setPlainText( '\n'.join( loadConfigList( 'black_from_contains' ) ) )
 		self.black_to.setPlainText( '\n'.join( loadConfigList( 'black_to_contains' ) ) )
@@ -307,7 +308,7 @@ class ConfigPage( QtGui.QWidget ) :
 		host = str(self.server_edit.text())
 		port = str(self.port_edit.text())
 		user = str(self.user_edit.text())
-		passwd = str(self.pass_edit.text())
+		passwd = base64.b64encode( str(self.pass_edit.text()) )
 		interval = int( str( self.interval_combo.currentText() ).split()[0] )
 		protocol = str( self.mailbox_combo.currentText() )
 
@@ -315,7 +316,7 @@ class ConfigPage( QtGui.QWidget ) :
 		config.setValue( 'host', QtCore.QVariant( host ) )
 		config.setValue( 'port', QtCore.QVariant( port ) )
 		config.setValue( 'user', QtCore.QVariant( user ) )
-		config.setValue( 'pass', QtCore.QVariant( passwd ) )
+		config.setValue( 'passwd', QtCore.QVariant( passwd ) )
 		config.setValue( 'interval', QtCore.QVariant( interval ) )
 		config.setValue( 'protocol', QtCore.QVariant( protocol ) )
 
@@ -459,7 +460,7 @@ class MainForm( QtGui.QDialog ) :
 
 		self.setWindowTitle( 'PopTray Minus' )
 		geometry = QtGui.QApplication.desktop().availableGeometry()
-		width = max( geometry.width() / 2, 700 )
+		width = max( geometry.width() / 2, 780 )
 		height = max( geometry.height() / 2, 300 )
 		self.resize( width, height )
 #		print width, height
@@ -494,7 +495,7 @@ class MainForm( QtGui.QDialog ) :
 
 	def setup_tabs( self ) :
 		load_settings()
-		headers = [ 'Score', 'From', 'To', 'Date', 'Subject' ]
+		headers = [ 'Score', 'From', 'To', 'Date', 'Size', 'Subject' ]
 		for i,acc in enumerate(settings) :
 			name = acc['name']
 			host = acc['host']
@@ -520,9 +521,10 @@ class MainForm( QtGui.QDialog ) :
 				table.setHeaderLabels( headers )
 
 				table.addTopLevelItem( QtGui.QTreeWidgetItem(
-						[ '-20.0', 'werwer', 'asdasdads', '2009-00-00 00:00:00' ] ) )
+						[ '-20.0', 'werwer', 'asdasdads', '2009-00-00 00:00:00', '1000.0 kB' ] ) )
 				table.resizeColumnToContents( 0 )
 				table.resizeColumnToContents( 3 )
+				table.resizeColumnToContents( 4 )
 				table.clear()
 
 				table.setColumnWidth( 1, self.size().width()/4 )
@@ -587,9 +589,17 @@ class MainForm( QtGui.QDialog ) :
 				item.setBackgroundColor( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
 			else :				# spam -- go red
 				item.setBackgroundColor( 0, QtGui.QColor( 255, max(255 - score,0), max(255 - score,0) ) )
+			item.setTextAlignment( 4, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter );
 			table.addTopLevelItem( item )
 		table.setSortingEnabled(True)
 		self.onSelectionChange()		# can't delete if no UIDL support
+
+		for i,mb in enumerate(self.mailboxen) :
+			msg_num = len(mb.messages)
+			if msg_num :
+				self.tab_widget.setTabText(i, "%s - %d" % (mb.title(), msg_num))
+			else :
+				self.tab_widget.setTabText(i, mb.title())
 
 	def strip_err( self, err ) :
 		if err.startswith( '-ERR ' ) :
@@ -826,6 +836,11 @@ class Mailbox :
 			msg_subj = self.decode_stuff( msg['subject'] )
 
 			try :
+				msg_size = '%.1f k ' % ( float( mbox.list( i ).split()[2] ) / 1024 )
+			except :
+				msg_size = ''
+
+			try :
 				msg_date = email.Utils.parsedate_tz( msg['date'] )
 				msg_date = datetime.datetime.fromtimestamp( email.Utils.mktime_tz( msg_date ) ).strftime( "%Y-%m-%d %H:%M:%S" )
 			except :
@@ -844,7 +859,7 @@ class Mailbox :
 			msg_subj = self.convert_to_unicode( msg_subj )
 
 			if debug :
-				print u'From: %s\nTo  : %s\nSubj: %s\nDate: %s' % (msg_from,  msg_to,  msg_subj, msg_date)
+				print u'From: %s\nTo  : %s\nSubj: %s\nDate: %s\nSize: %s' % (msg_from,  msg_to,  msg_subj, msg_date, msg_size)
 				print u'Score:', msg['X-SPAM-SCORE']
 
 			app.processEvents()
@@ -855,7 +870,7 @@ class Mailbox :
 				mbox.dele( i )
 				continue
 
-			msg_score = float( msg_score ) / 10.0
+			msg_score = '%5.1f' % ( float( msg_score ) / 10.0 )
 
 			if len(self.uidl) :
 				msg_id = self.uidl[i]
@@ -869,7 +884,7 @@ class Mailbox :
 				continue
 
 			self.new_mail += 1
-			self.messages[msg_id] = [ '%5.1f' % msg_score, msg_from, msg_to, msg_date, msg_subj ]
+			self.messages[msg_id] = [ msg_score, msg_from, msg_to, msg_date, msg_size, msg_subj ]
 
 	def open_mbox( self ) :
 		if self.account['protocol'] == 'POP3' :
@@ -1295,7 +1310,11 @@ def load_settings() :
 			acc['host'] = str(config.value( 'host' ).toString())
 			acc['port'] = int(config.value( 'port', QtCore.QVariant(110) ).toInt()[0])
 			acc['user'] = str(config.value( 'user' ).toString())
-			acc['pass'] = str(config.value( 'pass' ).toString())
+			if config.contains( 'pass' ) :
+				passwd = base64.b64encode( str(config.value( 'pass' ).toString()) )
+				config.setValue( 'passwd', QtCore.QVariant( passwd ) )
+				config.remove( 'pass' )
+			acc['pass'] = str(base64.b64decode(str(config.value( 'passwd' ).toString())))
 			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
 			acc['protocol'] = str(config.value( 'protocol', QtCore.QVariant( 'POP3' ) ).toString())
 			acc['black_from_contains'] = loadConfigList( 'black_from_contains' )
