@@ -1,46 +1,46 @@
-poptrayminus (1.2.0) UNRELEASED; urgency=medium
+poptrayminus (1.2.0) unstable; urgency=medium
 
   * bug fixes. (Closes: #XXXXXX)
 
  -- lenik <lenik@lazydroid.com>  Thu, 14 Jan 2010 22:26:30 +0900
 
-poptrayminus (1.1.0) UNRELEASED; urgency=medium
+poptrayminus (1.1.0) unstable; urgency=medium
 
   * password encoding, spam filtering improved. (Closes: #XXXXXX)
 
  -- lenik <lenik@lazydroid.com>  Thu, 07 Jan 2010 22:26:30 +0900
 
-poptrayminus (1.0.0) UNRELEASED; urgency=medium
+poptrayminus (1.0.0) unstable; urgency=medium
 
   * external contributions, bug fixes. (Closes: #XXXXXX)
 
  -- lenik <lenik@lazydroid.com>  Sun, 03 Jan 2010 22:26:30 +0900
 
-poptrayminus (0.9.0) UNRELEASED; urgency=medium
+poptrayminus (0.9.0) experimental; urgency=medium
 
   * POP3 SSL support. (Closes: #XXXXXX)
 
  -- lenik <lenik@lazydroid.com>  Tue, 14 Jul 2009 22:26:30 +0900
 
-poptrayminus (0.8.0) UNRELEASED; urgency=medium
+poptrayminus (0.8.0) experimental; urgency=medium
 
   * Bugfix release. (Closes: #XXXXXX)
 
  -- lenik <lenik@lazydroid.com>  Tue, 23 Jun 2009 22:26:30 +0900
 
-poptrayminus (0.7.0) UNRELEASED; urgency=medium
+poptrayminus (0.7.0) experimental; urgency=medium
 
   * Better interface. (Closes: #XXXXXX)
 
  -- lenik <lenik@lazydroid.com>  Tue, 23 Jun 2009 22:26:30 +0900
 
-poptrayminus (0.6.0) UNRELEASED; urgency=medium
+poptrayminus (0.6.0) experimental; urgency=medium
 
   * More features. (Closes: #XXXXXX)
 
  -- lenik <lenik@lazydroid.com>  Mon, 13 Apr 2009 22:26:30 +0900
 
-poptrayminus (0.5.0) UNRELEASED; urgency=medium
+poptrayminus (0.5.0) experimental; urgency=medium
 
   * Initial release. (Closes: #XXXXXX)
 
