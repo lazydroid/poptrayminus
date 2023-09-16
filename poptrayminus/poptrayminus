@@ -40,7 +40,7 @@ ICONS = {}
 PIXMAPS = {}
 
 try :
-	from PyQt5 import QtCore, QtGui
+	from PyQt5 import QtCore, QtGui, QtWidgets
 except ModuleNotFoundError as e :
 	print( 'Import error "%s", please reinstall PyQt5 libraries' % e )
 	print( '"sudo apt-get install python-qt5" may do the trick on Debian/Ubuntu' )
@@ -62,37 +62,37 @@ def log_this( s, sev = 0 ) :
 	print( t, severity[sev], s, file=ff )
 	ff.close()
 
-class sysTray(QtGui.QWidget):
+class sysTray(QtWidgets.QWidget):
 
 	def __init__(self, parent=None):
-		QtGui.QWidget.__init__(self, parent)
+		QtWidgets.QWidget.__init__(self, parent)
 		self.createActions()
 		self.createTrayIcon()
 		self.trayIcon.show()
 
 	def createActions(self):
-		self.aboutAction = QtGui.QAction( getIcon('gtk-about.png'), self.tr('&About'), self )
-		QtCore.QObject.connect(self.aboutAction, QtCore.SIGNAL("triggered()"), self.onAbout )
-		self.configAction = QtGui.QAction( getIcon('properties.png'), self.tr('&Settings'), self )
-		QtCore.QObject.connect(self.configAction, QtCore.SIGNAL("triggered()"), self.onConfig )
-		self.quitAction = QtGui.QAction( getIcon('gtk-quit.png'), self.tr("&Quit"), self)
-		QtCore.QObject.connect(self.quitAction, QtCore.SIGNAL("triggered()"), QtGui.qApp, QtCore.SLOT("quit()"))
+		self.aboutAction = QtWidgets.QAction( getIcon('gtk-about.png'), self.tr('&About'), self )
+		QtCore.QObject.aboutAction.triggered.connect( self.onAbout )
+		self.configAction = QtWidgets.QAction( getIcon('properties.png'), self.tr('&Settings'), self )
+		QtCore.QObject.configAction.triggered.connect( self.onConfig )
+		self.quitAction = QtWidgets.QAction( getIcon('gtk-quit.png'), self.tr("&Quit"), self)
+		QtCore.QObject.quitAction.triggered.connect( QtWidgets.qApp.quit )
 
 	def createTrayIcon(self):
-		self.trayIconMenu = QtGui.QMenu(self)
+		self.trayIconMenu = QtWidgets.QMenu(self)
 		self.trayIconMenu.addAction(self.aboutAction)
 		self.trayIconMenu.addAction(self.configAction)
 		self.trayIconMenu.addSeparator()
 		self.trayIconMenu.addAction(self.quitAction)
-		self.trayIcon = QtGui.QSystemTrayIcon(self)
+		self.trayIcon = QtWidgets.QSystemTrayIcon(self)
 		self.trayIcon.setContextMenu(self.trayIconMenu)
 		self.trayIcon.setIcon( getIcon( 'mail.png' ) )
-		QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('activated(QSystemTrayIcon::ActivationReason)'), self.onActivation )
+		QtCore.QObject.trayIcon.activated(QtWidgets.QSystemTrayIcon.ActivationReason).connect( self.onActivation )
 		# QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('messageClicked()'), self.onMessageClicked )
 
 	def onActivation(self, reason) :
 		# print( 'onActivation' )
-		if reason != QtGui.QSystemTrayIcon.Context :
+		if reason != QtWidgets.QSystemTrayIcon.Context :
 			if form.isHidden() :
 				form.refresh()
 				form.showNormal()	# form.show() ?
@@ -198,7 +198,7 @@ his book and code snippets.
 """
 		).show()
 
-class SortedTreeWidgetItem( QtGui.QTreeWidgetItem ) :
+class SortedTreeWidgetItem( QtWidgets.QTreeWidgetItem ) :
 
 	def __lt__( self, other ) :
 		column = self.treeWidget().sortColumn()
@@ -207,54 +207,54 @@ class SortedTreeWidgetItem( QtGui.QTreeWidgetItem ) :
 				return float(self.text(column).strip().split(' ')[0]) < float(other.text(column).strip().split(' ')[0])
 			except ValueError:
 				pass	# not a float maybe
-		return QtGui.QTreeWidgetItem.__lt__( self, other )
+		return QtWidgets.QTreeWidgetItem.__lt__( self, other )
 
 	def __ge__( self, other ) :
 		raise Exception('holy shit')
 
-class ConfigPage( QtGui.QWidget ) :
+class ConfigPage( QtWidgets.QWidget ) :
 	def __init__( self, parent = None ) :
 		super( ConfigPage, self ).__init__( parent )
 
 		# server parms
-		form_layout = QtGui.QFormLayout()
+		form_layout = QtWidgets.QFormLayout()
 
-		self.name_edit = QtGui.QLineEdit(self)
-		form_layout.setWidget( 0, QtGui.QFormLayout.FieldRole, self.name_edit)
-		self.mailbox_combo = QtGui.QComboBox(self)
-		form_layout.setWidget( 1, QtGui.QFormLayout.FieldRole, self.mailbox_combo)
-		self.server_edit = QtGui.QLineEdit(self)
-		form_layout.setWidget( 2, QtGui.QFormLayout.FieldRole, self.server_edit)
-		self.port_edit = QtGui.QLineEdit(self)
-		form_layout.setWidget( 3, QtGui.QFormLayout.FieldRole, self.port_edit)
-		self.user_edit = QtGui.QLineEdit(self)
-		form_layout.setWidget( 4, QtGui.QFormLayout.FieldRole, self.user_edit)
-		self.pass_edit = QtGui.QLineEdit(self)
-		self.pass_edit.setEchoMode(QtGui.QLineEdit.Password)	#*******************
-		form_layout.setWidget( 5, QtGui.QFormLayout.FieldRole, self.pass_edit)
-		self.interval_combo = QtGui.QComboBox(self)
-		form_layout.setWidget( 6, QtGui.QFormLayout.FieldRole, self.interval_combo)
+		self.name_edit = QtWidgets.QLineEdit(self)
+		form_layout.setWidget( 0, QtWidgets.QFormLayout.FieldRole, self.name_edit)
+		self.mailbox_combo = QtWidgets.QComboBox(self)
+		form_layout.setWidget( 1, QtWidgets.QFormLayout.FieldRole, self.mailbox_combo)
+		self.server_edit = QtWidgets.QLineEdit(self)
+		form_layout.setWidget( 2, QtWidgets.QFormLayout.FieldRole, self.server_edit)
+		self.port_edit = QtWidgets.QLineEdit(self)
+		form_layout.setWidget( 3, QtWidgets.QFormLayout.FieldRole, self.port_edit)
+		self.user_edit = QtWidgets.QLineEdit(self)
+		form_layout.setWidget( 4, QtWidgets.QFormLayout.FieldRole, self.user_edit)
+		self.pass_edit = QtWidgets.QLineEdit(self)
+		self.pass_edit.setEchoMode(QtWidgets.QLineEdit.Password)	#*******************
+		form_layout.setWidget( 5, QtWidgets.QFormLayout.FieldRole, self.pass_edit)
+		self.interval_combo = QtWidgets.QComboBox(self)
+		form_layout.setWidget( 6, QtWidgets.QFormLayout.FieldRole, self.interval_combo)
 
 		buddy_list = ( self.name_edit, self.mailbox_combo, self.port_edit, self.server_edit, self.user_edit, self.pass_edit, self.interval_combo )
 		buddy_labels = ('&Name:', 'P&rotocol :', '&Server :', '&Port :', '&Username :', '&Password :', '&Interval :')
 		for i,v in enumerate( buddy_labels ) :
-			label = QtGui.QLabel( v, self )
-			form_layout.setWidget( i, QtGui.QFormLayout.LabelRole, label )
+			label = QtWidgets.QLabel( v, self )
+			form_layout.setWidget( i, QtWidgets.QFormLayout.LabelRole, label )
 			label.setBuddy( buddy_list[i] )
 
 		# black lists
-		self.black_from = QtGui.QPlainTextEdit( self  )
-		black_from_layout = QtGui.QVBoxLayout()
-		black_from_layout.addWidget( QtGui.QLabel( 'Blacklist if "From" contains (one line - one pattern):', self ) )
+		self.black_from = QtWidgets.QPlainTextEdit( self  )
+		black_from_layout = QtWidgets.QVBoxLayout()
+		black_from_layout.addWidget( QtWidgets.QLabel( 'Blacklist if "From" contains (one line - one pattern):', self ) )
 		black_from_layout.addWidget( self.black_from )
 
-		self.black_to = QtGui.QPlainTextEdit( self  )
-		black_to_layout = QtGui.QVBoxLayout()
-		black_to_layout.addWidget( QtGui.QLabel( 'Blacklist if "To" contains (one line - one pattern):', self ) )
+		self.black_to = QtWidgets.QPlainTextEdit( self  )
+		black_to_layout = QtWidgets.QVBoxLayout()
+		black_to_layout.addWidget( QtWidgets.QLabel( 'Blacklist if "To" contains (one line - one pattern):', self ) )
 		black_to_layout.addWidget( self.black_to )
 
 		# page layout
-		layout = QtGui.QVBoxLayout( self )
+		layout = QtWidgets.QVBoxLayout( self )
 		layout.addLayout( form_layout )
 		layout.addLayout( black_from_layout )
 		layout.addLayout( black_to_layout )
@@ -268,7 +268,7 @@ class ConfigPage( QtGui.QWidget ) :
 			self.mailbox_combo.setCurrentIndex( 1 )
 		self.mailbox_combo.setEditable( False )
 		# QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL('activated(int)'), self.onMailbox )
-		QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL( 'currentIndexChanged(int)'), self.onMailbox )
+		QtCore.QObject.mailbox_combo.currentIndexChanged(int).connect( self.onMailbox )
 
 		interval = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
 		for i,v in enumerate( ( 5, 10, 15, 20, 30, 40, 60 ) ) :
@@ -363,25 +363,28 @@ class ConfigPage( QtGui.QWidget ) :
 			return self.user_edit.text()
 		return '%s@%s' % (self.user_edit.text(), self.server_edit.text())
 
-class ConfigForm( QtGui.QDialog ) :
+# self.connect(self.lineedit, SIGNAL("returnPressed()"), self.updateUi)
+# self.lineedit.returnPressed.connect(self.updateUi)
+
+class ConfigForm( QtWidgets.QDialog ) :
 	def __init__( self, parent = None ) :
 		super( ConfigForm, self ).__init__( parent )
 
 		self.setWindowTitle( 'PopTray Minus - Settings' )
 		self.resize( 400, 540 )
 
-		plus_button = QtGui.QPushButton( getIcon( 'plus.png' ), '' )
-		self.minus_button = QtGui.QPushButton( getIcon( 'minus.png' ), '' )
-		button_box = QtGui.QDialogButtonBox( QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel )
-		button_box.button( QtGui.QDialogButtonBox.Ok ).setDefault(True)
+		self.plus_button = QtWidgets.QPushButton( getIcon( 'plus.png' ), '' )
+		self.minus_button = QtWidgets.QPushButton( getIcon( 'minus.png' ), '' )
+		self.button_box = QtWidgets.QDialogButtonBox( QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel )
+		self.button_box.button( QtWidgets.QDialogButtonBox.Ok ).setDefault(True)
 
-		buttons_layout = QtGui.QHBoxLayout()
-		buttons_layout.addWidget( plus_button )
+		buttons_layout = QtWidgets.QHBoxLayout()
+		buttons_layout.addWidget( self.plus_button )
 		buttons_layout.addWidget( self.minus_button )
 		buttons_layout.addStretch()
-		buttons_layout.addWidget( button_box )
+		buttons_layout.addWidget( self.button_box )
 
-		self.tab_widget = QtGui.QTabWidget()
+		self.tab_widget = QtWidgets.QTabWidget()
 		self.pages = list()
 
 		for i in range( len(config.childGroups()) ) :
@@ -393,15 +396,16 @@ class ConfigForm( QtGui.QDialog ) :
 			config.endGroup()
 
 		# overall layout
-		layout = QtGui.QVBoxLayout( self )
+		layout = QtWidgets.QVBoxLayout( self )
 		layout.addWidget( self.tab_widget )
 		layout.addLayout( buttons_layout )
 
-		self.connect( button_box, QtCore.SIGNAL("accepted()"), self, QtCore.SLOT("accept()"))
-		self.connect( button_box, QtCore.SIGNAL("rejected()"), self, QtCore.SLOT("reject()"))
+		# self.connect( button_box, QtCore.SIGNAL("accepted()"), self, QtCore.SLOT("accept()"))
+		self.button_box.accepted.connect( self.accept )
+		self.button_box.rejected.connect( self.reject )
 
-		self.connect( plus_button, QtCore.SIGNAL('clicked()'), self.addAccount )
-		self.connect( self.minus_button, QtCore.SIGNAL('clicked()'), self.deleteAccount )
+		self.plus_button.clicked.connect( self.addAccount )
+		self.minus_button.clicked.connect( self.deleteAccount )
 
 	def addAccount( self ) :
 		page = ConfigPage()
@@ -425,7 +429,7 @@ class ConfigForm( QtGui.QDialog ) :
 				page.validate_data()
 			except Exception as e :
 				self.tab_widget.setCurrentWidget( page )
-				QtGui.QMessageBox.warning( self, 'Error', str(e) )
+				QtWidgets.QMessageBox.warning( self, 'Error', str(e) )
 				return
 
 		for i in range(count) :
@@ -447,38 +451,42 @@ class ConfigForm( QtGui.QDialog ) :
 		except Exception:
 			pass	# there may be no form open yet
 
-		QtGui.QDialog.accept(self)
+		# QtWidgets.QDialog.accept(self)
+		super(ConfigForm, self).accept()
 
-class MainForm( QtGui.QDialog ) :
+	def reject(self):
+		super(ConfigForm, self).reject()
+
+class MainForm( QtWidgets.QDialog ) :
 	def __init__( self, parent = None ) :
 		super( MainForm, self ).__init__( parent )
 
 		self.tables = list()
 		self.mailboxen = list()
-		self.tab_widget = QtGui.QTabWidget()
+		self.tab_widget = QtWidgets.QTabWidget()
 
 		self.setup_tabs()
 		self.setup_boxes()
 
-		self.reload_button = QtGui.QPushButton( 'reload', self )
+		self.reload_button = QtWidgets.QPushButton( 'reload', self )
 		self.reload_button.setIcon( getIcon( 'reload.png' ) )
-		self.delete_button = QtGui.QPushButton( 'delete', self )
+		self.delete_button = QtWidgets.QPushButton( 'delete', self )
 		self.delete_button.setIcon( getIcon( 'delete.png' ) )
-		self.preview_button = QtGui.QPushButton( 'preview', self )
+		self.preview_button = QtWidgets.QPushButton( 'preview', self )
 		self.preview_button.setIcon( getIcon( 'preview.png' ) )
-		button_layout = QtGui.QHBoxLayout()
+		button_layout = QtWidgets.QHBoxLayout()
 		button_layout.addWidget( self.preview_button )
 		button_layout.addWidget( self.delete_button )
 		button_layout.addStretch()
 		button_layout.addWidget( self.reload_button )
-		layout = QtGui.QVBoxLayout()
+		layout = QtWidgets.QVBoxLayout()
 		layout.addWidget( self.tab_widget )
 		layout.addLayout( button_layout )
 		self.setLayout( layout )
 
-		self.connect( self.preview_button, QtCore.SIGNAL( 'clicked()' ), self.onPreview )
-		self.connect( self.delete_button, QtCore.SIGNAL( 'clicked()' ), self.onDelete )
-		self.connect( self.reload_button, QtCore.SIGNAL( 'clicked()' ), self.onReload )
+		self.preview_button.clicked.connect( self.onPreview )
+		self.delete_button.clicked.connect( self.onDelete )
+		self.reload_button.clicked.connect( self.onReload )
 
 		self.connect( self.tab_widget, QtCore.SIGNAL( 'currentChanged(int)' ), self.tabChanged )
 #		self.connect( self.table, QtCore.SIGNAL( 'itemSelectionChanged()' ), self.onSelectionChange )
@@ -487,7 +495,7 @@ class MainForm( QtGui.QDialog ) :
 #		self.connect( self.table, QtCore.SIGNAL('customContextMenuRequested(QPoint)'), self.onContext)
 
 		self.setWindowTitle( 'PopTray Minus' )
-		geometry = QtGui.QApplication.desktop().availableGeometry()
+		geometry = QtWidgets.QApplication.desktop().availableGeometry()
 		width = max( geometry.width() / 2, 780 )
 		height = max( geometry.height() / 2, 300 )
 		self.resize( width, height )
@@ -496,7 +504,7 @@ class MainForm( QtGui.QDialog ) :
 		self.onSelectionChange()
 
 		self.timer = QtCore.QTimer()
-		self.connect( self.timer, QtCore.SIGNAL( 'timeout()'), self.auto_reload )
+		self.timer.timeout.connect( self.auto_reload )
 		self.timer.setInterval( 1000 )	# 1 sec
 		self.timer.setSingleShot( True )
 		self.timer.start()
@@ -545,30 +553,30 @@ class MainForm( QtGui.QDialog ) :
 			if i < len(self.tables) :
 				self.tab_widget.setTabText( i, title )
 			else :
-				table = QtGui.QTreeWidget()
-				self.tab_widget.addTab( table, title )
-				self.tables.append( table )
+				self.table = QtWidgets.QTreeWidget()
+				self.tab_widget.addTab( self.table, title )
+				self.tables.append( self.table )
 
-				self.connect( table, QtCore.SIGNAL( 'itemSelectionChanged()' ), self.onSelectionChange )
+				self.table.itemSelectionChanged.connect( self.onSelectionChange )
 
-				table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
-				self.connect( table, QtCore.SIGNAL('customContextMenuRequested(QPoint)'), self.onContext)
+				self.table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
+				self.table.customContextMenuRequested(QtGui.QPoint).connect( self.onContext )
 
-				table.setHeaderLabels( headers )
+				self.table.setHeaderLabels( headers )
 
-				table.addTopLevelItem( QtGui.QTreeWidgetItem(
+				self.table.addTopLevelItem( QtWidgets.QTreeWidgetItem(
 					[ '-20.0', 'werwer', 'asdasdads', '2009-00-00 00:00:00', '1000.0 kB' ] ))
-				table.resizeColumnToContents( 0 )
-				table.resizeColumnToContents( 3 )
-				table.resizeColumnToContents( 4 )
-				table.clear()
+				self.table.resizeColumnToContents( 0 )
+				self.table.resizeColumnToContents( 3 )
+				self.table.resizeColumnToContents( 4 )
+				self.table.clear()
 
-				table.setColumnWidth( 1, self.size().width()/4 )
-				table.setColumnWidth( 2, self.size().width()/4 )
-				table.setAlternatingRowColors(True)
-				table.setSelectionMode( QtGui.QTreeWidget.ExtendedSelection )
-				table.sortByColumn(3, QtCore.Qt.DescendingOrder)
-				table.setSortingEnabled(True)
+				self.table.setColumnWidth( 1, self.size().width()/4 )
+				self.table.setColumnWidth( 2, self.size().width()/4 )
+				self.table.setAlternatingRowColors(True)
+				self.table.setSelectionMode( QtWidgets.QTreeWidget.ExtendedSelection )
+				self.table.sortByColumn(3, QtCore.Qt.DescendingOrder)
+				self.table.setSortingEnabled(True)
 
 		for i in range(len(settings),len(self.tables)) :
 			self.tables.pop()
@@ -585,7 +593,7 @@ class MainForm( QtGui.QDialog ) :
 		if (event.modifiers() == QtCore.Qt.NoModifier and event.key() == QtCore.Qt.Key_Return ) :
 			self.onPreview()
 		if (event.modifiers() != QtCore.Qt.NoModifier or event.key() != QtCore.Qt.Key_Escape ) :
-			QtGui.QDialog.keyPressEvent( self, event )
+			QtWidgets.QDialog.keyPressEvent( self, event )
 		else :
 			event.ignore()
 			self.hide()
@@ -725,10 +733,10 @@ class MainForm( QtGui.QDialog ) :
 		if len(self.mailboxen[index].uidl) == 0 or len(items) == 0 :
 			return
 
-		reply = QtGui.QMessageBox.question(self, 'PopTray Minus - Delete Messages',
+		reply = QtWidgets.QMessageBox.question(self, 'PopTray Minus - Delete Messages',
 				'Do you really want to delete %d messages?' % len(items),
-				QtGui.QMessageBox.Yes | QtGui.QMessageBox.No )
-		if reply != QtGui.QMessageBox.Yes:
+				QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No )
+		if reply != QtWidgets.QMessageBox.Yes:
 			return
 
 #		for i in items :
@@ -770,15 +778,15 @@ class MainForm( QtGui.QDialog ) :
 
 	def onContext( self, point ) :
 		# print( 'context!', point )
-		previewAction = QtGui.QAction( getIcon('preview.png'), self.tr('Preview'), self )
-		QtCore.QObject.connect( previewAction, QtCore.SIGNAL("triggered()"), self.onPreview )
-		deleteAction = QtGui.QAction( getIcon('delete.png'), self.tr('Delete'), self )
-		QtCore.QObject.connect( deleteAction, QtCore.SIGNAL("triggered()"), self.onDelete )
+		previewAction = QtWidgets.QAction( getIcon('preview.png'), self.tr('Preview'), self )
+		QtCore.QObject.previewAction.triggered.connect( self.onPreview )
+		deleteAction = QtWidgets.QAction( getIcon('delete.png'), self.tr('Delete'), self )
+		QtCore.QObject.deleteAction.triggered.connect( self.onDelete )
 
 		self.updatePreviewDelete( previewAction, deleteAction )
 
 #		offset = QtCore.QPoint( 3, 26 )
-		contextMenu = QtGui.QMenu(self)
+		contextMenu = QtWidgets.QMenu(self)
 		contextMenu.addAction( previewAction )
 		contextMenu.addSeparator()
 		contextMenu.addAction( deleteAction )
@@ -787,21 +795,21 @@ class MainForm( QtGui.QDialog ) :
 		contextMenu.exec_( table.mapToGlobal( point + offset ))
 
 
-class BrowserForm(QtGui.QDialog):
+class BrowserForm(QtWidgets.QDialog):
 
 	def __init__(self, parent=None, title = '', text=''):
 		super(BrowserForm, self).__init__(parent)
 #		self.setAttribute(QtCore.Qt.WA_GroupLeader)
 		self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-		browser = QtGui.QTextBrowser()
+		browser = QtWidgets.QTextBrowser()
 		browser.setOpenExternalLinks(True)
 		browser.setText( text )
-		layout = QtGui.QVBoxLayout()
+		layout = QtWidgets.QVBoxLayout()
 		layout.setMargin(0)
 		layout.addWidget(browser)
 		self.setLayout(layout)
 		self.resize(500, 500)
-		QtGui.QShortcut(QtGui.QKeySequence("Escape"), self, self.close)
+		QtWidgets.QShortcut(QtWidgets.QKeySequence("Escape"), self, self.close)
 		self.setWindowTitle( title )
 
 class Mailbox :
@@ -1383,8 +1391,8 @@ def load_settings() :
 			settings.append( acc )
 		config.endGroup()
 
-app = QtGui.QApplication(sys.argv)
-app.setOrganizationDomain('server-pro.com')
+app = QtWidgets.QApplication(sys.argv)
+app.setOrganizationDomain('lazydroid.com')
 app.setApplicationName('PopTray Minus')
 app.setWindowIcon(getIcon('mail_q_16x16.png'))
 
