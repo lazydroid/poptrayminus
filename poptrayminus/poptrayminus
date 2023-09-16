@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 # poptray.py -- POP3 message checker and filter
-# Copyright (C) 2009-2010 lenik terenin
+# Copyright (C) 2009-2013 lenik terenin
 #
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -17,12 +17,12 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# $Id: poptray.py 177 2010-01-14 04:20:47Z lenik $
+# $Id: poptray.py 235 2013-05-12 14:32:43Z lenik $
 
-import poplib,  email, base64, codecs, types
-import os, sys, datetime, socket, chardet
+import poplib,  email, base64, codecs, types, traceback
+import os, sys, datetime, socket, chardet, time
 
-__version__ = "1.2.0"
+__version__ = "1.3.0"
 
 ICONS = {}
 PIXMAPS = {}
@@ -36,6 +36,19 @@ except ImportError, e :
 
 sys.stdin = codecs.getreader("UTF8")(sys.stdin)
 sys.stdout = codecs.getwriter("UTF8")(sys.stdout)
+
+# timeout in seconds (for every (!) socket)
+timeout = 23
+socket.setdefaulttimeout(timeout)
+
+severity = ( '-', '=', '+', '*' )
+
+def log_this( s, sev = 0 ) :
+	t = time.strftime( "%Y-%m-%d %H:%M:%S", time.localtime(time.time()) )
+#	print t, severity[sev], s
+	ff = open( os.path.expanduser("~") + '/poptray.log', 'a' )
+	print >>ff, t, severity[sev], s
+	ff.close()
 
 class sysTray(QtGui.QWidget):
 
@@ -90,8 +103,8 @@ class sysTray(QtGui.QWidget):
 #		print 'about!'
 		BrowserForm(self, "PopTray Minus - About",
 u"""
-<h2>PopTray Minus v1.2</h2>
-<h4>Copyright (c) 2009-2010 lenik terenin</h4>
+<h2>PopTray Minus v1.3</h2>
+<h4>Copyright (c) 2009-2013 lenik terenin</h4>
 
 <p>If you're looking at this text, you have already figured out how
 to right-click a context menu from the icon in the tray =)
@@ -179,7 +192,7 @@ class SortedTreeWidgetItem( QtGui.QTreeWidgetItem ) :
 		column = self.treeWidget().sortColumn()
 		if column == 0 or column == 4  :
 			try :		# sort scores or sizes as floats
-				return float(self.text(column).split(' ')[0]) < float(other.text(column).split(' ')[0])
+				return float(self.text(column).strip().split(' ')[0]) < float(other.text(column).strip().split(' ')[0])
 			except:
 				pass	# not a float maybe
 		return QtGui.QTreeWidgetItem.__lt__( self, other )
@@ -512,7 +525,8 @@ class MainForm( QtGui.QDialog ) :
 
 			try :
 				msg_num = len(self.mailboxen[i].messages)
-				title = '%s - %d' % (title, msg_num)
+				if msg_num :
+					title = '%s - %d' % (title, msg_num)
 			except :
 				pass
 
@@ -597,9 +611,9 @@ class MainForm( QtGui.QDialog ) :
 			item = SortedTreeWidgetItem( table, self.mailboxen[index].messages[i] )
 			item.setData( 1, QtCore.Qt.UserRole, QtCore.QVariant(i))
 			score = float(self.mailboxen[index].messages[i][0]) * 10
-			if score < 0 :	# ham -- go green
+			if score < 0 :		# ham -- go green
 				item.setBackgroundColor( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
-			else :				# spam -- go red
+			else :			# spam -- go red
 				item.setBackgroundColor( 0, QtGui.QColor( 255, max(255 - score,0), max(255 - score,0) ) )
 			item.setTextAlignment( 4, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter );
 			table.addTopLevelItem( item )
@@ -632,16 +646,22 @@ class MainForm( QtGui.QDialog ) :
 			mb.rescan()
 			err_msg = None
 		except poplib.error_proto, e :
-#			print 'POP3 error:', e
+			if debug :
+				print 'POP3 error:', e
 			err_msg = self.strip_err( e[0] )
 		except socket.gaierror, (errno, errmsg) :
-#			print 'POP3 error:', errmsg
+			if debug :
+				print 'POP3 error:', errmsg
 			err_msg = errmsg
-		except socket.error, (errno, errmsg) :
-#			print 'POP3 error:', errmsg
-			err_msg = errmsg
+		except socket.error, errmsg :
+			if debug :
+				print 'POP3 error:', errmsg
+			err_msg = str(errmsg)
+		except :
+			err_msg = traceback.format_exc()
 
 		if err_msg :
+			log_this( err_msg, 2 )
 			tray.setToolTip( err_msg )
 			tray.trayIcon.showMessage( 'POP3 error', err_msg )
 			tray.trayIcon.setIcon( getIcon( 'mail-mark-important.png' ) )
@@ -836,16 +856,25 @@ class Mailbox :
 
 	def load_messages( self, mbox, nums ) :
 		self.new_mail = 0
-		for i in nums :
-			tray.setToolTip( 'processing message %d of %d\n%s' % ( i, len(nums), self.title()) )
+		for (k,i) in enumerate(nums) :
+			tray.setToolTip( 'processing message %d of %d\n%s' % ( k, len(nums), self.title()) )
 			if debug :
 				print '-' * 80
 			header = mbox.top( i, 0)[1]
 			msg = email.message_from_string( '\n'.join( header ) )
 
-			msg_from = self.decode_stuff( msg['from'] )
-			msg_to = ' '.join( self.decode_stuff( msg['to'] ) .split() )
-			msg_subj = self.decode_stuff( msg['subject'] )
+			try :
+				msg_from = self.decode_stuff( msg['from'] )
+			except UnicodeDecodeError :
+				msg_from = '** FAILED TO DECODE **'
+			try :
+				msg_to = ' '.join( self.decode_stuff( msg['to'] ) .split() )
+			except UnicodeDecodeError :
+				msg_to = '** FAILED TO DECODE **'
+			try :
+				msg_subj = self.decode_stuff( msg['subject'] )
+			except :	# email.errors.HeaderParseError in email.Header.decode_header( stuff )
+				msg_subj = '** FAILED TO DECODE **'
 
 			try :
 				msg_size = '%.1f k ' % ( float( mbox.list( i ).split()[2] ) / 1024 )
@@ -853,7 +882,9 @@ class Mailbox :
 				msg_size = ''
 
 			try :
-				msg_date = email.Utils.parsedate_tz( msg['date'] )
+				for ds in ['delivery-date','date'] :
+					if ds in msg :
+						msg_date = email.Utils.parsedate_tz( msg[ds] )
 				msg_date = datetime.datetime.fromtimestamp( email.Utils.mktime_tz( msg_date ) ).strftime( "%Y-%m-%d %H:%M:%S" )
 			except :
 				msg_date = 'None'
@@ -882,7 +913,10 @@ class Mailbox :
 				mbox.dele( i )
 				continue
 
-			msg_score = '%5.1f' % ( float( msg_score ) / 10.0 )
+			try :
+				msg_score = '%5.1f' % ( float( msg_score ) / 10.0 )
+			except :
+				msg_score = '0.0'
 
 			if len(self.uidl) :
 				msg_id = self.uidl[i]
