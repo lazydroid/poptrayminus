@@ -59,7 +59,7 @@ def log_this( s, sev = 0 ) :
 	t = time.strftime( "%Y-%m-%d %H:%M:%S", time.localtime(time.time()) )
 #	print( t, severity[sev], s )
 	ff = open( os.path.expanduser("~") + '/poptray.log', 'a' )
-	print( >>ff, t, severity[sev], s )
+	print( t, severity[sev], s, file=ff )
 	ff.close()
 
 class sysTray(QtGui.QWidget):
@@ -88,10 +88,10 @@ class sysTray(QtGui.QWidget):
 		self.trayIcon.setContextMenu(self.trayIconMenu)
 		self.trayIcon.setIcon( getIcon( 'mail.png' ) )
 		QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('activated(QSystemTrayIcon::ActivationReason)'), self.onActivation )
-#		QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('messageClicked()'), self.onMessageClicked )
+		# QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('messageClicked()'), self.onMessageClicked )
 
 	def onActivation(self, reason) :
-#		print( 'onActivation' )
+		# print( 'onActivation' )
 		if reason != QtGui.QSystemTrayIcon.Context :
 			if form.isHidden() :
 				form.refresh()
@@ -102,17 +102,17 @@ class sysTray(QtGui.QWidget):
 				form.hide()
 
 	def onConfig(self) :
-#		print( 'config!' )
+		# print( 'config!' )
 		ConfigForm(self).show()
 
-#	def onMessageClicked(self) :
-#		print( 'clicked!!' )
+	# def onMessageClicked(self) :
+	# 	print( 'clicked!!' )
 
 	def setToolTip( self, tip ) :
 		self.trayIcon.setToolTip( tip )
 
 	def onAbout(self) :
-#		print( 'about!' )
+		# print( 'about!' )
 		BrowserForm(self, "PopTray Minus - About",
 u"""
 <h2>PopTray Minus v1.5</h2>
@@ -205,12 +205,12 @@ class SortedTreeWidgetItem( QtGui.QTreeWidgetItem ) :
 		if column == 0 or column == 4  :
 			try :		# sort scores or sizes as floats
 				return float(self.text(column).strip().split(' ')[0]) < float(other.text(column).strip().split(' ')[0])
-			except:
+			except ValueError:
 				pass	# not a float maybe
 		return QtGui.QTreeWidgetItem.__lt__( self, other )
 
 	def __ge__( self, other ) :
-		raise 'holy shit'
+		raise Exception('holy shit')
 
 class ConfigPage( QtGui.QWidget ) :
 	def __init__( self, parent = None ) :
@@ -219,27 +219,27 @@ class ConfigPage( QtGui.QWidget ) :
 		# server parms
 		form_layout = QtGui.QFormLayout()
 
-		self.name_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 0, QtGui.QFormLayout.FieldRole, self.name_edit);
-		self.mailbox_combo = QtGui.QComboBox(self);
-		form_layout.setWidget( 1, QtGui.QFormLayout.FieldRole, self.mailbox_combo);
-		self.server_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 2, QtGui.QFormLayout.FieldRole, self.server_edit);
-		self.port_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 3, QtGui.QFormLayout.FieldRole, self.port_edit);
-		self.user_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 4, QtGui.QFormLayout.FieldRole, self.user_edit);
-		self.pass_edit = QtGui.QLineEdit(self);
-		self.pass_edit.setEchoMode(QtGui.QLineEdit.Password);	#*******************
-		form_layout.setWidget( 5, QtGui.QFormLayout.FieldRole, self.pass_edit);
-		self.interval_combo = QtGui.QComboBox(self);
-		form_layout.setWidget( 6, QtGui.QFormLayout.FieldRole, self.interval_combo);
+		self.name_edit = QtGui.QLineEdit(self)
+		form_layout.setWidget( 0, QtGui.QFormLayout.FieldRole, self.name_edit)
+		self.mailbox_combo = QtGui.QComboBox(self)
+		form_layout.setWidget( 1, QtGui.QFormLayout.FieldRole, self.mailbox_combo)
+		self.server_edit = QtGui.QLineEdit(self)
+		form_layout.setWidget( 2, QtGui.QFormLayout.FieldRole, self.server_edit)
+		self.port_edit = QtGui.QLineEdit(self)
+		form_layout.setWidget( 3, QtGui.QFormLayout.FieldRole, self.port_edit)
+		self.user_edit = QtGui.QLineEdit(self)
+		form_layout.setWidget( 4, QtGui.QFormLayout.FieldRole, self.user_edit)
+		self.pass_edit = QtGui.QLineEdit(self)
+		self.pass_edit.setEchoMode(QtGui.QLineEdit.Password)	#*******************
+		form_layout.setWidget( 5, QtGui.QFormLayout.FieldRole, self.pass_edit)
+		self.interval_combo = QtGui.QComboBox(self)
+		form_layout.setWidget( 6, QtGui.QFormLayout.FieldRole, self.interval_combo)
 
-		buddy_list = ( self.name_edit, self.mailbox_combo, self.port_edit, self.server_edit, self.user_edit, self.pass_edit, self.interval_combo );
+		buddy_list = ( self.name_edit, self.mailbox_combo, self.port_edit, self.server_edit, self.user_edit, self.pass_edit, self.interval_combo )
 		buddy_labels = ('&Name:', 'P&rotocol :', '&Server :', '&Port :', '&Username :', '&Password :', '&Interval :')
 		for i,v in enumerate( buddy_labels ) :
 			label = QtGui.QLabel( v, self )
-			form_layout.setWidget( i, QtGui.QFormLayout.LabelRole, label );
+			form_layout.setWidget( i, QtGui.QFormLayout.LabelRole, label )
 			label.setBuddy( buddy_list[i] )
 
 		# black lists
@@ -267,7 +267,7 @@ class ConfigPage( QtGui.QWidget ) :
 		else :
 			self.mailbox_combo.setCurrentIndex( 1 )
 		self.mailbox_combo.setEditable( False )
-#		QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL('activated(int)'), self.onMailbox )
+		# QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL('activated(int)'), self.onMailbox )
 		QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL( 'currentIndexChanged(int)'), self.onMailbox )
 
 		interval = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
@@ -283,7 +283,7 @@ class ConfigPage( QtGui.QWidget ) :
 		self.user_edit.setText( str(config.value( 'user' ).toString()) )
 		try :
 			self.pass_edit.setText( base64.b64decode( str(config.value( 'passwd' ).toString()) ) )
-		except :
+		except Exception:
 			pass
 
 		self.black_from.setPlainText( '\n'.join( loadConfigList( 'black_from_contains' ) ) )
@@ -293,7 +293,7 @@ class ConfigPage( QtGui.QWidget ) :
 		self.black_to.setToolTip( 'messages with matching substring in "To:" will be deleted' )
 
 	def onMailbox( self, selection ) :
-#		print( 'activated: ', selection )
+		# print( 'activated: ', selection )
 		if selection == 1 :
 			self.port_edit.setText( '995' )
 		else :
@@ -304,7 +304,7 @@ class ConfigPage( QtGui.QWidget ) :
 		pats = list( i for i in pats if len(i) )
 		too_short = list( i for i in pats if len(i) < 4 )
 		if len(too_short) :
-			raise Exception, 'Blacklisted "%s" patterns are too short,\nsupposed to be at least 5 characters long:\n%s' % (name, str(too_short))
+			raise Exception( 'Blacklisted "%s" patterns are too short,\nsupposed to be at least 5 characters long:\n%s' % (name, str(too_short)))
 
 		return pats
 
@@ -316,20 +316,20 @@ class ConfigPage( QtGui.QWidget ) :
 		passwd = str(self.pass_edit.text())
 		try :
 			socket.gethostbyname( host )
-		except Exception, (errno, errmsg) :
-			raise Exception, host + ' -- ' + errmsg
+		except Exception as e :
+			raise Exception( host + ' -- ' + str(e))
 
 		try :
 			port = int(port)
-		except :
-			raise Exception, "port value should be numeric"
+		except ValueError:
+			raise Exception( "port value should be numeric")
 
 		bf = self.extract_patterns( self.black_from, 'From' )
-		bt = self.extract_patterns( self. black_to, 'To' )
+		bt = self.extract_patterns( self.black_to, 'To' )
 
 		for i,v in (( host, 'Server address'), ( user, 'User name' ) ) :
 			if not len(i) :
-				raise Exception, '%s can not be empty' % v
+				raise Exception( '%s can not be empty' % v )
 
 	def save_data( self ) :
 		name = str(self.name_edit.text())
@@ -423,7 +423,7 @@ class ConfigForm( QtGui.QDialog ) :
 			page = self.tab_widget.widget( i )
 			try :
 				page.validate_data()
-			except Exception, e :
+			except Exception as e :
 				self.tab_widget.setCurrentWidget( page )
 				QtGui.QMessageBox.warning( self, 'Error', str(e) )
 				return
@@ -444,7 +444,7 @@ class ConfigForm( QtGui.QDialog ) :
 
 		try :
 			form.timer.setInterval( 1000 )	# 1 sec to form.reload
-		except :
+		except Exception:
 			pass	# there may be no form open yet
 
 		QtGui.QDialog.accept(self)
@@ -502,7 +502,7 @@ class MainForm( QtGui.QDialog ) :
 		self.timer.start()
 
 	def tabChanged( self ) :
-#		print( 'changed' )
+		# print( 'changed' )
 		self.refresh()
 
 	def setup_boxes( self ) :
@@ -539,7 +539,7 @@ class MainForm( QtGui.QDialog ) :
 				msg_num = len(self.mailboxen[i].messages)
 				if msg_num :
 					title = '%s - %d' % (title, msg_num)
-			except :
+			except Exception:
 				pass
 
 			if i < len(self.tables) :
@@ -557,7 +557,7 @@ class MainForm( QtGui.QDialog ) :
 				table.setHeaderLabels( headers )
 
 				table.addTopLevelItem( QtGui.QTreeWidgetItem(
-						[ '-20.0', 'werwer', 'asdasdads', '2009-00-00 00:00:00', '1000.0 kB' ] ) )
+					[ '-20.0', 'werwer', 'asdasdads', '2009-00-00 00:00:00', '1000.0 kB' ] ))
 				table.resizeColumnToContents( 0 )
 				table.resizeColumnToContents( 3 )
 				table.resizeColumnToContents( 4 )
@@ -575,7 +575,7 @@ class MainForm( QtGui.QDialog ) :
 			self.tab_widget.removeTab( i )
 
 	def closeEvent( self, event ) :
-#		print( 'use menu quit()' )
+		# print( 'use menu quit()' )
 		event.ignore()
 		self.hide()
 
@@ -647,7 +647,7 @@ class MainForm( QtGui.QDialog ) :
 		for i in ( self.reload_button, self.preview_button, self.delete_button ) :
 			i.setEnabled( False )
 
-		if mb == None :		# reload button, not autoreload
+		if mb is None :		# reload button, not autoreload
 			index = self.tab_widget.currentIndex()
 			mb = self.mailboxen[index]
 			load_settings()
@@ -657,19 +657,19 @@ class MainForm( QtGui.QDialog ) :
 		try :
 			mb.rescan()
 			err_msg = None
-		except poplib.error_proto, e :
+		except poplib.error_proto as e :
 			if debug :
 				print( 'POP3 error:', e )
 			err_msg = self.strip_err( e[0] )
-		except socket.gaierror as (errno, errmsg) :
+		except socket.gaierror as e :
 			if debug :
-				print( 'POP3 error:', errmsg )
-			err_msg = errmsg
-		except socket.error, errmsg :
+				print( 'POP3 error:', str(e) )
+			err_msg = str(e)
+		except socket.error as e :
 			if debug :
-				print( 'POP3 error:', errmsg )
-			err_msg = str(errmsg)
-		except :
+				print( 'POP3 error:', str(e) )
+			err_msg = str(e)
+		except Exception:
 			err_msg = traceback.format_exc()
 
 		if err_msg :
@@ -678,18 +678,18 @@ class MainForm( QtGui.QDialog ) :
 			tray.trayIcon.showMessage( 'POP3 error', err_msg )
 			tray.trayIcon.setIcon( getIcon( 'mail-mark-important.png' ) )
 		else :
-				if mb.new_mail :	# new mail has arrived?
-#					tray.trayIcon.setIcon( self.create_icon('mail-mark-unread.png', len( mailbox.messages ) ) )
-					tray.trayIcon.showMessage( 'New mail', "%d new messages\n%s" % (mb.new_mail, mb.title()) )
-#				else :
-#					tray.trayIcon.setIcon( self.create_icon('mail.png', len( mailbox.messages ) ) )
+			if mb.new_mail :	# new mail has arrived?
+				# tray.trayIcon.setIcon( self.create_icon('mail-mark-unread.png', len( mailbox.messages ) ) )
+				tray.trayIcon.showMessage( 'New mail', "%d new messages\n%s" % (mb.new_mail, mb.title()) )
+			# else :
+				# tray.trayIcon.setIcon( self.create_icon('mail.png', len( mailbox.messages ) ) )
 
-				msg_num = sum( (len(mb.messages) for mb in self.mailboxen ) )
-				tray.trayIcon.setIcon( self.create_icon('mail.png', msg_num ) )
+			msg_num = sum( (len(mb.messages) for mb in self.mailboxen ) )
+			tray.trayIcon.setIcon( self.create_icon('mail.png', msg_num ) )
 
-				info = ( (len(mb.messages), mb.new_mail, mb.title(), mb.date ) for mb in self.mailboxen )
+			info = ( (len(mb.messages), mb.new_mail, mb.title(), mb.date ) for mb in self.mailboxen )
 
-				tray.setToolTip( '\n---\n'.join( "%d emails, %d new\n%s\n%s" % i for i in info ) )
+			tray.setToolTip( '\n---\n'.join( "%d emails, %d new\n%s\n%s" % i for i in info ) )
 
 		self.refresh()
 
@@ -718,7 +718,7 @@ class MainForm( QtGui.QDialog ) :
 		self.timer.start()
 
 	def onDelete( self ) :
-#		print( 'delete' )
+		# print( 'delete' )
 		table = self.tab_widget.currentWidget()
 		index = self.tab_widget.currentIndex()
 		items = table.selectedItems()
@@ -740,7 +740,7 @@ class MainForm( QtGui.QDialog ) :
 		self.mailboxen[index].killed = set()
 
 	def onPreview( self ) :
-#		print( 'preview', )
+		# print( 'preview', )
 		table = self.tab_widget.currentWidget()
 		index = self.tab_widget.currentIndex()
 		item = table.currentItem()
@@ -749,12 +749,12 @@ class MainForm( QtGui.QDialog ) :
 		if item :
 			try :
 				text = self.mailboxen[index].get_message( item_id )
-			except Exception, e :
-				text = '<font color=red>error : ' + str( e ) + '</font>'
+			except Exception as e :
+				text = '<font color=red>error : ' + str(e) + '</font>'
 			BrowserForm( self, 'PopTray - Preview', text ).show()
 
 	def onReload( self ) :
-#		print( 'reload' )
+		# print( 'reload' )
 		self.reload()
 
 	def updatePreviewDelete( self, preview, delete ) :
@@ -769,7 +769,7 @@ class MainForm( QtGui.QDialog ) :
 		self.updatePreviewDelete( self.preview_button, self.delete_button )
 
 	def onContext( self, point ) :
-#		print( 'context!', point )
+		# print( 'context!', point )
 		previewAction = QtGui.QAction( getIcon('preview.png'), self.tr('Preview'), self )
 		QtCore.QObject.connect( previewAction, QtCore.SIGNAL("triggered()"), self.onPreview )
 		deleteAction = QtGui.QAction( getIcon('delete.png'), self.tr('Delete'), self )
@@ -826,8 +826,8 @@ class Mailbox :
 		for (data, encoding) in email.Header.decode_header( stuff ) :
 			if encoding :
 				try :
-					data = unicode( data,  encoding )
-				except :
+					data = str( data,  encoding=encoding )
+				except Exception:
 					pass	# bad encoding, do nothing
 			lines.append( data )
 		return ' '.join( lines )
@@ -837,26 +837,26 @@ class Mailbox :
 			raise poplib.error_proto( (data[0], ) )
 
 	def is_blacklisted( self, msg_from, msg_to, msg_subj ) :
-			for name in self.account['black_from_contains'] :
-				if msg_from.lower().find( name.lower() ) != -1 :
-					return True
-			for name in self.account['black_to_contains'] :
-				if msg_to.lower().find( name.lower() ) != -1 :
-					return True
-			return False
+		for name in self.account['black_from_contains'] :
+			if msg_from.lower().find( name.lower() ) != -1 :
+				return True
+		for name in self.account['black_to_contains'] :
+			if msg_to.lower().find( name.lower() ) != -1 :
+				return True
+		return False
 
 	def convert_to_unicode( self, string ) :
-		if type(string) != types.UnicodeType :
+		if not isinstance( string, types.UnicodeType) :
 			try :
 				enc = chardet.detect( string )
-				if enc['encoding'] != 'ascii' and enc['encoding'] != None :
+				if enc['encoding'] != 'ascii' and enc['encoding'] is not None :
 					if debug :
 						print( 'encoding: ', enc )
 					try :
-						string = unicode( string, enc['encoding'] )
-					except :
+						string = str( string, encoding=enc['encoding'] )
+					except Exception:
 						pass	# bad encoding, do nothing
-			except UnicodeDecodeError, e :
+			except UnicodeDecodeError as e :
 				if debug :
 					print( type(string) )
 				string = '*****' + str(e)
@@ -885,12 +885,12 @@ class Mailbox :
 				msg_to = '** FAILED TO DECODE **'
 			try :
 				msg_subj = self.decode_stuff( msg['subject'] )
-			except :	# email.errors.HeaderParseError in email.Header.decode_header( stuff )
+			except Exception:	# email.errors.HeaderParseError in email.Header.decode_header( stuff )
 				msg_subj = '** FAILED TO DECODE **'
 
 			try :
 				msg_size = '%.1f k ' % ( float( mbox.list( i ).split()[2] ) / 1024 )
-			except :
+			except Exception:
 				msg_size = ''
 
 			try :
@@ -898,7 +898,7 @@ class Mailbox :
 					if ds in msg :
 						msg_date = email.Utils.parsedate_tz( msg[ds] )
 				msg_date = datetime.datetime.fromtimestamp( email.Utils.mktime_tz( msg_date ) ).strftime( "%Y-%m-%d %H:%M:%S" )
-			except :
+			except Exception:
 				msg_date = 'None'
 
 			msg_score = msg['x-spam-score']
@@ -927,7 +927,7 @@ class Mailbox :
 
 			try :
 				msg_score = '%5.1f' % ( float( msg_score ) / 10.0 )
-			except :
+			except Exception:
 				msg_score = '0.0'
 
 			if len(self.uidl) :
@@ -960,7 +960,7 @@ class Mailbox :
 		try :
 			self.check_error( uidl )
 			uidl = uidl[1]
-		except :
+		except Exception:
 			uidl = []
 #		print( uidl )
 		return uidl
@@ -1305,7 +1305,7 @@ def getIcon(name):
 	icon = ICONS.get(name)
 	if icon is None:
 		return QtGui.QIcon(name)
-	if isinstance(icon, basestring):
+	if isinstance(icon, str):	# ???
 		pixmap = QtGui.QPixmap()
 		pixmap.loadFromData(base64.b64decode(icon))
 		icon = QtGui.QIcon(pixmap)
@@ -1316,7 +1316,7 @@ def getPixmap(name):
 	image = PIXMAPS.get(name)
 	if image is None:
 		return QtGui.QPixmap(name)
-	if isinstance(image, basestring):
+	if isinstance(image, str):	# ???
 		pixmap = QtGui.QPixmap()
 		pixmap.loadFromData(base64.b64decode(image))
 #		PIXMAPS[name] = image = pixmap
@@ -1333,11 +1333,11 @@ def loadConfigList( name ) :
 	return config_list
 
 def saveConfigList( name, config_list ) :
-	config.beginWriteArray( name );
+	config.beginWriteArray( name )
 	for i,v in enumerate( config_list ) :
-		config.setArrayIndex(i);
-		config.setValue("pattern", QtCore.QVariant(v) );
-	config.endArray();
+		config.setArrayIndex(i)
+		config.setValue("pattern", QtCore.QVariant(v) )
+	config.endArray()
 
 def fixConfig() :
 	# convert old configs and remove old settings
@@ -1374,7 +1374,7 @@ def load_settings() :
 				config.remove( 'pass' )
 			try :
 				acc['pass'] = str(base64.b64decode(str(config.value( 'passwd' ).toString())))
-			except :
+			except Exception:
 				acc['pass'] = ''		# b64decode failed ?
 			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
 			acc['protocol'] = str(config.value( 'protocol', QtCore.QVariant( 'POP3' ) ).toString())
