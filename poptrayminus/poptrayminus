@@ -1,23 +1,29 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # poptray.py -- POP3 message checker and filter
-# Copyright (C) 2009-2014 lenik terenin
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# version 2 as published by the Free Software Foundation.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# $Id: poptray.py 281 2014-05-15 09:17:15Z lenik $
+# Copyright (c) 2023 lenik terenin
+#
+# MIT License
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 import poplib,  email, base64, codecs, types, traceback
 import os, sys, datetime, socket, chardet, time
@@ -28,16 +34,16 @@ try :	# fix around 'line too long' issue https://bugs.python.org/issue16041
 except AttributeError :
 	pass
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 ICONS = {}
 PIXMAPS = {}
 
 try :
-	from PyQt4 import QtCore, QtGui
-except ImportError, e :
-	print 'Import error "%s", please reinstall PyQt4 libraries' % e
-	print '"sudo apt-get install python-qt4" may do the trick on Debian/Ubuntu'
+	from PyQt5 import QtCore, QtGui
+except ModuleNotFoundError as e :
+	print( 'Import error "%s", please reinstall PyQt5 libraries' % e )
+	print( '"sudo apt-get install python-qt5" may do the trick on Debian/Ubuntu' )
 	sys.exit()
 
 sys.stdin = codecs.getreader("UTF8")(sys.stdin)
@@ -51,9 +57,9 @@ severity = ( '-', '=', '+', '*' )
 
 def log_this( s, sev = 0 ) :
 	t = time.strftime( "%Y-%m-%d %H:%M:%S", time.localtime(time.time()) )
-#	print t, severity[sev], s
+#	print( t, severity[sev], s )
 	ff = open( os.path.expanduser("~") + '/poptray.log', 'a' )
-	print >>ff, t, severity[sev], s
+	print( >>ff, t, severity[sev], s )
 	ff.close()
 
 class sysTray(QtGui.QWidget):
@@ -85,7 +91,7 @@ class sysTray(QtGui.QWidget):
 #		QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('messageClicked()'), self.onMessageClicked )
 
 	def onActivation(self, reason) :
-#		print 'onActivation'
+#		print( 'onActivation' )
 		if reason != QtGui.QSystemTrayIcon.Context :
 			if form.isHidden() :
 				form.refresh()
@@ -96,21 +102,21 @@ class sysTray(QtGui.QWidget):
 				form.hide()
 
 	def onConfig(self) :
-#		print 'config!'
+#		print( 'config!' )
 		ConfigForm(self).show()
 
 #	def onMessageClicked(self) :
-#		print 'clicked!!'
+#		print( 'clicked!!' )
 
 	def setToolTip( self, tip ) :
 		self.trayIcon.setToolTip( tip )
 
 	def onAbout(self) :
-#		print 'about!'
+#		print( 'about!' )
 		BrowserForm(self, "PopTray Minus - About",
 u"""
-<h2>PopTray Minus v1.4</h2>
-<h4>Copyright (c) 2009-2017 lenik terenin</h4>
+<h2>PopTray Minus v1.5</h2>
+<h4>Copyright (c) 2009-2023 lenik terenin</h4>
 
 <p>If you're looking at this text, you have already figured out how
 to right-click a context menu from the icon in the tray =)
@@ -287,7 +293,7 @@ class ConfigPage( QtGui.QWidget ) :
 		self.black_to.setToolTip( 'messages with matching substring in "To:" will be deleted' )
 
 	def onMailbox( self, selection ) :
-#		print 'activated: ', selection
+#		print( 'activated: ', selection )
 		if selection == 1 :
 			self.port_edit.setText( '995' )
 		else :
@@ -485,7 +491,7 @@ class MainForm( QtGui.QDialog ) :
 		width = max( geometry.width() / 2, 780 )
 		height = max( geometry.height() / 2, 300 )
 		self.resize( width, height )
-#		print width, height
+#		print( width, height )
 
 		self.onSelectionChange()
 
@@ -496,13 +502,13 @@ class MainForm( QtGui.QDialog ) :
 		self.timer.start()
 
 	def tabChanged( self ) :
-#		print 'changed'
+#		print( 'changed' )
 		self.refresh()
 
 	def setup_boxes( self ) :
 		boxes = list()
 		boxnum = dict( (str(b.account),n) for n,b in enumerate(self.mailboxen) )
-#		print boxnum
+#		print( boxnum )
 
 		load_settings()
 
@@ -569,7 +575,7 @@ class MainForm( QtGui.QDialog ) :
 			self.tab_widget.removeTab( i )
 
 	def closeEvent( self, event ) :
-#		print 'use menu quit()'
+#		print( 'use menu quit()' )
 		event.ignore()
 		self.hide()
 
@@ -621,7 +627,7 @@ class MainForm( QtGui.QDialog ) :
 				item.setBackgroundColor( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
 			else :			# spam -- go red
 				item.setBackgroundColor( 0, QtGui.QColor( 255, max(255 - score,0), max(255 - score,0) ) )
-			item.setTextAlignment( 4, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter );
+			item.setTextAlignment( 4, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter )
 			table.addTopLevelItem( item )
 		table.setSortingEnabled(True)
 		self.onSelectionChange()		# can't delete if no UIDL support
@@ -653,15 +659,15 @@ class MainForm( QtGui.QDialog ) :
 			err_msg = None
 		except poplib.error_proto, e :
 			if debug :
-				print 'POP3 error:', e
+				print( 'POP3 error:', e )
 			err_msg = self.strip_err( e[0] )
-		except socket.gaierror, (errno, errmsg) :
+		except socket.gaierror as (errno, errmsg) :
 			if debug :
-				print 'POP3 error:', errmsg
+				print( 'POP3 error:', errmsg )
 			err_msg = errmsg
 		except socket.error, errmsg :
 			if debug :
-				print 'POP3 error:', errmsg
+				print( 'POP3 error:', errmsg )
 			err_msg = str(errmsg)
 		except :
 			err_msg = traceback.format_exc()
@@ -712,7 +718,7 @@ class MainForm( QtGui.QDialog ) :
 		self.timer.start()
 
 	def onDelete( self ) :
-#		print 'delete'
+#		print( 'delete' )
 		table = self.tab_widget.currentWidget()
 		index = self.tab_widget.currentIndex()
 		items = table.selectedItems()
@@ -726,20 +732,20 @@ class MainForm( QtGui.QDialog ) :
 			return
 
 #		for i in items :
-#			print i.data( 1, QtCore.Qt.UserRole ).toString()
+#			print( i.data( 1, QtCore.Qt.UserRole ).toString() )
 		self.mailboxen[index].killed = set( str( i.data( 1, QtCore.Qt.UserRole ).toString()) for i in items )
-#		print mailbox.killed
+#		print( mailbox.killed )
 
 		self.reload()
 		self.mailboxen[index].killed = set()
 
 	def onPreview( self ) :
-#		print 'preview',
+#		print( 'preview', )
 		table = self.tab_widget.currentWidget()
 		index = self.tab_widget.currentIndex()
 		item = table.currentItem()
 		item_id = str(item.data( 1, QtCore.Qt.UserRole ).toString())
-#		print item_id
+#		print( item_id )
 		if item :
 			try :
 				text = self.mailboxen[index].get_message( item_id )
@@ -748,7 +754,7 @@ class MainForm( QtGui.QDialog ) :
 			BrowserForm( self, 'PopTray - Preview', text ).show()
 
 	def onReload( self ) :
-#		print 'reload'
+#		print( 'reload' )
 		self.reload()
 
 	def updatePreviewDelete( self, preview, delete ) :
@@ -763,7 +769,7 @@ class MainForm( QtGui.QDialog ) :
 		self.updatePreviewDelete( self.preview_button, self.delete_button )
 
 	def onContext( self, point ) :
-#		print 'context!', point
+#		print( 'context!', point )
 		previewAction = QtGui.QAction( getIcon('preview.png'), self.tr('Preview'), self )
 		QtCore.QObject.connect( previewAction, QtCore.SIGNAL("triggered()"), self.onPreview )
 		deleteAction = QtGui.QAction( getIcon('delete.png'), self.tr('Delete'), self )
@@ -845,18 +851,18 @@ class Mailbox :
 				enc = chardet.detect( string )
 				if enc['encoding'] != 'ascii' and enc['encoding'] != None :
 					if debug :
-						print 'encoding: ', enc
+						print( 'encoding: ', enc )
 					try :
 						string = unicode( string, enc['encoding'] )
 					except :
 						pass	# bad encoding, do nothing
 			except UnicodeDecodeError, e :
 				if debug :
-					print type(string)
+					print( type(string) )
 				string = '*****' + str(e)
 #			except TypeError, e :
 #				if debug :
-#					print type(msg_subj)
+#					print( type(msg_subj) )
 #				msg_subj = '*****' + str(e)
 		return string
 
@@ -865,7 +871,7 @@ class Mailbox :
 		for (k,i) in enumerate(nums) :
 			tray.setToolTip( 'processing message %d of %d\n%s' % ( k, len(nums), self.title()) )
 			if debug :
-				print '-' * 80
+				print( '-' * 80 )
 			header = mbox.top( i, 0)[1]
 			msg = email.message_from_string( '\n'.join( header ) )
 
@@ -908,14 +914,14 @@ class Mailbox :
 			msg_subj = self.convert_to_unicode( msg_subj )
 
 			if debug :
-				print u'From: %s\nTo  : %s\nSubj: %s\nDate: %s\nSize: %s' % (msg_from,  msg_to,  msg_subj, msg_date, msg_size)
-				print u'Score:', msg['X-SPAM-SCORE']
+				print( u'From: %s\nTo  : %s\nSubj: %s\nDate: %s\nSize: %s' % (msg_from,  msg_to,  msg_subj, msg_date, msg_size) )
+				print( u'Score:', msg['X-SPAM-SCORE'] )
 
 			app.processEvents()
 
 			if self.is_blacklisted( msg_from, msg_to, msg_subj ) :
 				if debug :
-					print '**DELETED**'
+					print( '**DELETED**' )
 				mbox.dele( i )
 				continue
 
@@ -931,7 +937,7 @@ class Mailbox :
 
 			if msg_id in self.killed :
 				if debug :
-					print '**KILLED**'
+					print( '**KILLED**' )
 				mbox.dele( i )
 				continue
 
@@ -950,13 +956,13 @@ class Mailbox :
 
 	def get_uidl( self, mbox ) :
 		uidl = mbox.uidl()
-#		print uidl
+#		print( uidl )
 		try :
 			self.check_error( uidl )
 			uidl = uidl[1]
 		except :
 			uidl = []
-#		print uidl
+#		print( uidl )
 		return uidl
 
 	def get_message( self, msg_id ) :
@@ -982,8 +988,8 @@ class Mailbox :
 
 		mbox = self.open_mbox()
 		if debug :
-			print "%d emails, %d bytes" % mbox.stat(), datetime.datetime.now().strftime( "%F %T" )
-#		print mbox.list()
+			print( "%d emails, %d bytes" % mbox.stat(), datetime.datetime.now().strftime( "%F %T" ) )
+#		print( mbox.list() )
 
 		uidl = self.get_uidl( mbox )
 
@@ -991,20 +997,20 @@ class Mailbox :
 			num_to_uidl = dict( u.split() for u in uidl )
 			num_to_uidl = dict( (int(n),num_to_uidl[n]) for n in num_to_uidl )
 			uidl_to_num = dict( (num_to_uidl[n],n) for n in num_to_uidl )
-#			print num_to_uidl
-#			print uidl_to_num
+#			print( num_to_uidl )
+#			print( uidl_to_num )
 
 			old_messages = set( n for n in self.messages )
-#			print old_messages
+#			print( old_messages )
 
 			new_messages = set( n for n in uidl_to_num )
-#			print new_messages
+#			print( new_messages )
 
 			gone = old_messages - new_messages
 			came = new_messages - old_messages
-#			print 'gone :', gone
-#			print 'came :', came
-#			print 'kill : ', self.killed
+#			print( 'gone :', gone )
+#			print( 'came :', came )
+#			print( 'kill : ', self.killed )
 
 #			self.new_mail = len(came)
 
@@ -1014,7 +1020,7 @@ class Mailbox :
 			nums = sorted( list( int(uidl_to_num[i]) for i in came | self.killed ) )
 			if len(nums) :
 				if debug :
-					print 'loading: ', nums
+					print( 'loading: ', nums )
 
 			self.uidl = num_to_uidl
 		else :
@@ -1026,7 +1032,7 @@ class Mailbox :
 		self.date = datetime.datetime.now().strftime( "%F %R" )
 
 		if debug :
-			print '-' * 80
+			print( '-' * 80 )
 		mbox.quit()
 
 PIXMAPS['mail.png'] = ICONS['mail.png'] = """\
@@ -1396,7 +1402,7 @@ if not len(config.allKeys()) :
 		sys.exit()
 
 load_settings()
-#print settings
+#print( settings )
 
 form = MainForm()
 tray = sysTray()
