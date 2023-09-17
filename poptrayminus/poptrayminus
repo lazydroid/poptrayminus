@@ -864,7 +864,8 @@ class Mailbox :
 				if enc['encoding'] != 'ascii' and enc['encoding'] is not None :
 					if debug :
 						print( 'encoding: ', enc )
-					string = string.decode(enc['encoding'],errors='ignore')
+					encoding = 'utf-8' if enc['confidence'] < 0.5 else enc['encoding']
+					string = string.decode( encoding, errors='ignore')
 					# try :
 					# 	string = str( string, encoding=enc['encoding'] )
 					# except Exception:
