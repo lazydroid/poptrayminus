@@ -1336,7 +1336,7 @@ def loadConfigList( name ) :
 	size = config.beginReadArray( name )
 	for i in range(size) :
 		config.setArrayIndex(i)
-		config_list.append( str(config.value("pattern").toString()) )
+		config_list.append( str(config.value("pattern")) )
 	config.endArray()
 	return config_list
 
@@ -1351,7 +1351,7 @@ def fixConfig() :
 	# convert old configs and remove old settings
 	for i in ('host', 'user', 'pass', 'interval' ) :
 		if config.contains( i ) :
-			val = str(config.value( i ).toString())
+			val = str(config.value( i ))
 			config.beginGroup( 'account0' )
 			config.setValue( i, QtCore.QVariant(val) )
 			config.endGroup()
@@ -1372,20 +1372,20 @@ def load_settings() :
 		config.beginGroup( 'account%d' % i )
 		if config.contains( 'host' ) :
 			acc = {}
-			acc['name'] = str(config.value( 'name' ).toString())
-			acc['host'] = str(config.value( 'host' ).toString())
-			acc['port'] = int(config.value( 'port', QtCore.QVariant(110) ).toInt()[0])
-			acc['user'] = str(config.value( 'user' ).toString())
+			acc['name'] = str(config.value( 'name' ))
+			acc['host'] = str(config.value( 'host' ))
+			acc['port'] = int(config.value( 'port', QtCore.QVariant(110) ))
+			acc['user'] = str(config.value( 'user' ))
 			if config.contains( 'pass' ) :
-				passwd = base64.b64encode( str(config.value( 'pass' ).toString()) )
+				passwd = base64.b64encode( str(config.value( 'pass' )) )
 				config.setValue( 'passwd', QtCore.QVariant( passwd ) )
 				config.remove( 'pass' )
 			try :
-				acc['pass'] = str(base64.b64decode(str(config.value( 'passwd' ).toString())))
+				acc['pass'] = str(base64.b64decode(str(config.value( 'passwd' ))))
 			except Exception:
 				acc['pass'] = ''		# b64decode failed ?
-			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
-			acc['protocol'] = str(config.value( 'protocol', QtCore.QVariant( 'POP3' ) ).toString())
+			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ))
+			acc['protocol'] = str(config.value( 'protocol', QtCore.QVariant( 'POP3' ) ))
 			acc['black_from_contains'] = loadConfigList( 'black_from_contains' )
 			acc['black_to_contains'] = loadConfigList( 'black_to_contains' )
 			settings.append( acc )
