@@ -25,7 +25,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import poplib,  email, base64, json, types, traceback
+import poplib,  email, base64, json, traceback
 import os, sys, datetime, socket, chardet, time
 
 try :	# fix around 'line too long' issue https://bugs.python.org/issue16041
@@ -633,9 +633,9 @@ class MainForm( QtWidgets.QDialog ) :
 			item.setData( 1, QtCore.Qt.UserRole, QtCore.QVariant(i))
 			score = float(self.mailboxen[index].messages[i][0]) * 10
 			if score < 0 :		# ham -- go green
-				item.setBackgroundColor( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
+				item.setBackground( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
 			else :			# spam -- go red
-				item.setBackgroundColor( 0, QtGui.QColor( 255, max(255 - score,0), max(255 - score,0) ) )
+				item.setBackground( 0, QtGui.QColor( 255, max(255 - score,0), max(255 - score,0) ) )
 			item.setTextAlignment( 4, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter )
 			table.addTopLevelItem( item )
 		table.setSortingEnabled(True)
@@ -831,15 +831,16 @@ class Mailbox :
 		return '%s@%s' % (self.account['user'], self.account['host'])
 
 	def decode_stuff( self, stuff ) :
-		lines = list()
-		for (data, encoding) in email.Header.decode_header( stuff ) :
-			if encoding :
-				try :
-					data = str( data,  encoding=encoding )
-				except Exception:
-					pass	# bad encoding, do nothing
-			lines.append( data )
-		return ' '.join( lines )
+		return '' if stuff is None else stuff
+		# lines = list()
+		# for (data, encoding) in email.Header.decode_header( stuff ) :
+		# 	if encoding :
+		# 		try :
+		# 			data = str( data,  encoding=encoding )
+		# 		except Exception:
+		# 			pass	# bad encoding, do nothing
+		# 	lines.append( data )
+		# return ' '.join( lines )
 
 	def check_error( self, data ) :
 		if not data[0].startswith( '+OK' ) :
@@ -855,17 +856,23 @@ class Mailbox :
 		return False
 
 	def convert_to_unicode( self, string ) :
-		if not isinstance( string, types.UnicodeType) :
+		if not isinstance( string, str) :
 			try :
+				if string is None:
+					return ''
 				enc = chardet.detect( string )
 				if enc['encoding'] != 'ascii' and enc['encoding'] is not None :
 					if debug :
 						print( 'encoding: ', enc )
-					try :
-						string = str( string, encoding=enc['encoding'] )
-					except Exception:
-						pass	# bad encoding, do nothing
+					string = string.decode(enc['encoding'],errors='ignore')
+					# try :
+					# 	string = str( string, encoding=enc['encoding'] )
+					# except Exception:
+					# 	pass	# bad encoding, do nothing
+				else :
+					string = string.decode('utf-8')
 			except UnicodeDecodeError as e :
+				import IPython; IPython.embed()
 				if debug :
 					print( type(string) )
 				string = '*****' + str(e)
@@ -882,7 +889,11 @@ class Mailbox :
 			if debug :
 				print( '-' * 80 )
 			header = mbox.top( i, 0)[1]
-			msg = email.message_from_string( '\n'.join( header ) )
+			# print( header )
+			separator = b'\n' if isinstance( header[0], bytes) else '\n'
+			# header = [self.convert_to_unicode(h) for h in mbox.top( i, 0)[1]]
+			msg = email.message_from_string( self.convert_to_unicode( separator.join( header )))
+			# import IPython; IPython.embed()
 
 			try :
 				msg_from = self.decode_stuff( msg['from'] )
@@ -903,10 +914,11 @@ class Mailbox :
 				msg_size = ''
 
 			try :
-				for ds in ['delivery-date','date'] :
+				for ds in ['date','delivery-date'] :
 					if ds in msg :
-						msg_date = email.Utils.parsedate_tz( msg[ds] )
-				msg_date = datetime.datetime.fromtimestamp( email.Utils.mktime_tz( msg_date ) ).strftime( "%Y-%m-%d %H:%M:%S" )
+						msg_date = msg[ds]
+						break
+				msg_date = email.utils.parsedate_to_datetime( msg_date ).strftime('%Y-%m-%d %H:%M:%S')
 			except Exception:
 				msg_date = 'None'
 
