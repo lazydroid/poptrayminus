@@ -46,9 +46,6 @@ except ModuleNotFoundError as e :
 	print( '"sudo apt-get install python-qt5" may do the trick on Debian/Ubuntu' )
 	sys.exit()
 
-# sys.stdin = codecs.getreader("UTF8")(sys.stdin)
-# sys.stdout = codecs.getwriter("UTF8")(sys.stdout)
-
 # timeout in seconds (for every (!) socket)
 timeout = 23
 socket.setdefaulttimeout(timeout)
@@ -113,8 +110,7 @@ class sysTray(QtWidgets.QWidget):
 
 	def onAbout(self) :
 		# print( 'about!' )
-		BrowserForm(self, "PopTray Minus - About",
-u"""
+		BrowserForm(self, "PopTray Minus - About", u"""
 <h2>PopTray Minus v1.5</h2>
 <h4>Copyright (c) 2009-2023 lenik terenin</h4>
 
@@ -1391,28 +1387,30 @@ def load_settings() :
 			settings.append( acc )
 		config.endGroup()
 
-app = QtWidgets.QApplication(sys.argv)
-app.setOrganizationDomain('lazydroid.com')
-app.setApplicationName('PopTray Minus')
-app.setWindowIcon(getIcon('mail_q_16x16.png'))
+if __name__ == '__main__':
 
-debug = '-debug' in sys.argv
+	app = QtWidgets.QApplication(sys.argv)
+	app.setOrganizationDomain('lazydroid.com')
+	app.setApplicationName('PopTray Minus')
+	app.setWindowIcon(getIcon('mail_q_16x16.png'))
 
-app.setQuitOnLastWindowClosed( False )
+	debug = '-debug' in sys.argv
 
-#config = QtCore.QSettings( 'PopTray', 'poptray' )
-config = QtCore.QSettings( os.path.expanduser("~") + '/.poptrayrc', QtCore.QSettings.NativeFormat )
+	app.setQuitOnLastWindowClosed( False )
 
-fixConfig()	# convert old configs and remove old settings
+	#config = QtCore.QSettings( 'PopTray', 'poptray' )
+	config = QtCore.QSettings( os.path.expanduser("~") + '/.poptrayrc', QtCore.QSettings.NativeFormat )
 
-if not len(config.allKeys()) :
-	if not ConfigForm().exec_() :	# ConfigForm checks for valid host
-		sys.exit()
+	fixConfig()	# convert old configs and remove old settings
 
-load_settings()
-#print( settings )
+	if not len(config.allKeys()) :
+		if not ConfigForm().exec_() :	# ConfigForm checks for valid host
+			sys.exit()
 
-form = MainForm()
-tray = sysTray()
+	load_settings()
+	# print( '%r' % settings )
 
-sys.exit( app.exec_() )
+	form = MainForm()
+	tray = sysTray()
+
+	sys.exit( app.exec_() )
