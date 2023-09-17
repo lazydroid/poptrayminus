@@ -46,8 +46,8 @@ except ModuleNotFoundError as e :
 	print( '"sudo apt-get install python-qt5" may do the trick on Debian/Ubuntu' )
 	sys.exit()
 
-sys.stdin = codecs.getreader("UTF8")(sys.stdin)
-sys.stdout = codecs.getwriter("UTF8")(sys.stdout)
+# sys.stdin = codecs.getreader("UTF8")(sys.stdin)
+# sys.stdout = codecs.getwriter("UTF8")(sys.stdout)
 
 # timeout in seconds (for every (!) socket)
 timeout = 23
