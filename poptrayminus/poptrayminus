@@ -25,7 +25,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import poplib,  email, base64, codecs, types, traceback
+import poplib,  email, base64, json, types, traceback
 import os, sys, datetime, socket, chardet, time
 
 try :	# fix around 'line too long' issue https://bugs.python.org/issue16041
@@ -69,11 +69,11 @@ class sysTray(QtWidgets.QWidget):
 
 	def createActions(self):
 		self.aboutAction = QtWidgets.QAction( getIcon('gtk-about.png'), self.tr('&About'), self )
-		QtCore.QObject.aboutAction.triggered.connect( self.onAbout )
+		self.aboutAction.triggered.connect( self.onAbout )
 		self.configAction = QtWidgets.QAction( getIcon('properties.png'), self.tr('&Settings'), self )
-		QtCore.QObject.configAction.triggered.connect( self.onConfig )
+		self.configAction.triggered.connect( self.onConfig )
 		self.quitAction = QtWidgets.QAction( getIcon('gtk-quit.png'), self.tr("&Quit"), self)
-		QtCore.QObject.quitAction.triggered.connect( QtWidgets.qApp.quit )
+		self.quitAction.triggered.connect( QtWidgets.qApp.quit )
 
 	def createTrayIcon(self):
 		self.trayIconMenu = QtWidgets.QMenu(self)
@@ -84,7 +84,8 @@ class sysTray(QtWidgets.QWidget):
 		self.trayIcon = QtWidgets.QSystemTrayIcon(self)
 		self.trayIcon.setContextMenu(self.trayIconMenu)
 		self.trayIcon.setIcon( getIcon( 'mail.png' ) )
-		QtCore.QObject.trayIcon.activated(QtWidgets.QSystemTrayIcon.ActivationReason).connect( self.onActivation )
+		# QtCore.QObject.trayIcon.activated(QtWidgets.QSystemTrayIcon.ActivationReason).connect( self.onActivation )
+		self.trayIcon.activated.connect( self.onActivation )
 		# QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('messageClicked()'), self.onMessageClicked )
 
 	def onActivation(self, reason) :
@@ -484,7 +485,9 @@ class MainForm( QtWidgets.QDialog ) :
 		self.delete_button.clicked.connect( self.onDelete )
 		self.reload_button.clicked.connect( self.onReload )
 
-		self.connect( self.tab_widget, QtCore.SIGNAL( 'currentChanged(int)' ), self.tabChanged )
+		self.tab_widget.currentChanged.connect( self.tabChanged )
+		# self.tab_widget.currentChanged(int).connect( self.tabChanged )
+
 #		self.connect( self.table, QtCore.SIGNAL( 'itemSelectionChanged()' ), self.onSelectionChange )
 
 #		self.table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
@@ -556,7 +559,9 @@ class MainForm( QtWidgets.QDialog ) :
 				self.table.itemSelectionChanged.connect( self.onSelectionChange )
 
 				self.table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
-				self.table.customContextMenuRequested(QtGui.QPoint).connect( self.onContext )
+
+				# self.table.customContextMenuRequested(QtCore.QPoint).connect( self.onContextEvent )
+				self.table.customContextMenuRequested.connect( self.onContext )
 
 				self.table.setHeaderLabels( headers )
 
@@ -1377,7 +1382,7 @@ def load_settings() :
 				config.setValue( 'passwd', QtCore.QVariant( passwd ) )
 				config.remove( 'pass' )
 			try :
-				acc['pass'] = str(base64.b64decode(str(config.value( 'passwd' ))))
+				acc['pass'] = base64.b64decode(str(config.value( 'passwd' ))).decode('utf-8')
 			except Exception:
 				acc['pass'] = ''		# b64decode failed ?
 			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ))
@@ -1394,7 +1399,7 @@ if __name__ == '__main__':
 	app.setApplicationName('PopTray Minus')
 	app.setWindowIcon(getIcon('mail_q_16x16.png'))
 
-	debug = '-debug' in sys.argv
+	debug = True	# '-debug' in sys.argv
 
 	app.setQuitOnLastWindowClosed( False )
 
@@ -1408,7 +1413,7 @@ if __name__ == '__main__':
 			sys.exit()
 
 	load_settings()
-	# print( '%r' % settings )
+	print( 'Settings: %s' % json.dumps(settings, indent='\t') )
 
 	form = MainForm()
 	tray = sysTray()
