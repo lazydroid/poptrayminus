@@ -873,7 +873,7 @@ class Mailbox :
 				else :
 					string = string.decode('utf-8')
 			except UnicodeDecodeError as e :
-				import IPython; IPython.embed()
+				# import IPython; IPython.embed()
 				if debug :
 					print( type(string) )
 				string = '*****' + str(e)
