@@ -631,7 +631,7 @@ class MainForm( QtWidgets.QDialog ) :
 		for i in self.mailboxen[index].messages :
 			item = SortedTreeWidgetItem( table, self.mailboxen[index].messages[i] )
 			item.setData( 1, QtCore.Qt.UserRole, QtCore.QVariant(i))
-			score = float(self.mailboxen[index].messages[i][0]) * 10
+			score = int(float(self.mailboxen[index].messages[i][0]) * 10)
 			if score < 0 :		# ham -- go green
 				item.setBackground( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
 			else :			# spam -- go red
