@@ -1,11 +1,11 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 from distutils.core import setup
 
 setup(
 	name = 'poptrayminus',
-	version = '1.4.0',
+	version = '1.5.0',
 	description = 'POP3 mailbox monitor with tray icon notifications',
 	long_description = 'PopTray Minus checks POP3 mailbox, filters spam and shows message header previews.',
 	author = 'Lenik Terenin',
