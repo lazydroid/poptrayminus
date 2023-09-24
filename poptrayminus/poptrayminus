@@ -1,25 +1,31 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
 # poptray.py -- POP3 message checker and filter
-# Copyright (C) 2009-2014 lenik terenin
-#
-# This program is free software; you can redistribute it and/or
-# modify it under the terms of the GNU General Public License
-# version 2 as published by the Free Software Foundation.
-#
-# This program is distributed in the hope that it will be useful,
-# but WITHOUT ANY WARRANTY; without even the implied warranty of
-# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-# GNU General Public License for more details.
-#
-# You should have received a copy of the GNU General Public License
-# along with this program; if not, write to the Free Software
-# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-# $Id: poptray.py 281 2014-05-15 09:17:15Z lenik $
+# Copyright (c) 2023 lenik terenin
+#
+# MIT License
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
-import poplib,  email, base64, codecs, types, traceback
+import poplib,  email, base64, json, traceback
 import os, sys, datetime, socket, chardet, time
 
 try :	# fix around 'line too long' issue https://bugs.python.org/issue16041
@@ -28,20 +34,17 @@ try :	# fix around 'line too long' issue https://bugs.python.org/issue16041
 except AttributeError :
 	pass
 
-__version__ = "1.4.0"
+__version__ = "1.5.0"
 
 ICONS = {}
 PIXMAPS = {}
 
 try :
-	from PyQt4 import QtCore, QtGui
-except ImportError, e :
-	print 'Import error "%s", please reinstall PyQt4 libraries' % e
-	print '"sudo apt-get install python-qt4" may do the trick on Debian/Ubuntu'
+	from PyQt5 import QtCore, QtGui, QtWidgets
+except ModuleNotFoundError as e :
+	print( 'Import error "%s", please reinstall PyQt5 libraries' % e )
+	print( '"sudo apt-get install python-qt5" may do the trick on Debian/Ubuntu' )
 	sys.exit()
-
-sys.stdin = codecs.getreader("UTF8")(sys.stdin)
-sys.stdout = codecs.getwriter("UTF8")(sys.stdout)
 
 # timeout in seconds (for every (!) socket)
 timeout = 23
@@ -51,42 +54,43 @@ severity = ( '-', '=', '+', '*' )
 
 def log_this( s, sev = 0 ) :
 	t = time.strftime( "%Y-%m-%d %H:%M:%S", time.localtime(time.time()) )
-#	print t, severity[sev], s
+#	print( t, severity[sev], s )
 	ff = open( os.path.expanduser("~") + '/poptray.log', 'a' )
-	print >>ff, t, severity[sev], s
+	print( t, severity[sev], s, file=ff )
 	ff.close()
 
-class sysTray(QtGui.QWidget):
+class sysTray(QtWidgets.QWidget):
 
 	def __init__(self, parent=None):
-		QtGui.QWidget.__init__(self, parent)
+		QtWidgets.QWidget.__init__(self, parent)
 		self.createActions()
 		self.createTrayIcon()
 		self.trayIcon.show()
 
 	def createActions(self):
-		self.aboutAction = QtGui.QAction( getIcon('gtk-about.png'), self.tr('&About'), self )
-		QtCore.QObject.connect(self.aboutAction, QtCore.SIGNAL("triggered()"), self.onAbout )
-		self.configAction = QtGui.QAction( getIcon('properties.png'), self.tr('&Settings'), self )
-		QtCore.QObject.connect(self.configAction, QtCore.SIGNAL("triggered()"), self.onConfig )
-		self.quitAction = QtGui.QAction( getIcon('gtk-quit.png'), self.tr("&Quit"), self)
-		QtCore.QObject.connect(self.quitAction, QtCore.SIGNAL("triggered()"), QtGui.qApp, QtCore.SLOT("quit()"))
+		self.aboutAction = QtWidgets.QAction( getIcon('gtk-about.png'), self.tr('&About'), self )
+		self.aboutAction.triggered.connect( self.onAbout )
+		self.configAction = QtWidgets.QAction( getIcon('properties.png'), self.tr('&Settings'), self )
+		self.configAction.triggered.connect( self.onConfig )
+		self.quitAction = QtWidgets.QAction( getIcon('gtk-quit.png'), self.tr("&Quit"), self)
+		self.quitAction.triggered.connect( QtWidgets.qApp.quit )
 
 	def createTrayIcon(self):
-		self.trayIconMenu = QtGui.QMenu(self)
+		self.trayIconMenu = QtWidgets.QMenu(self)
 		self.trayIconMenu.addAction(self.aboutAction)
 		self.trayIconMenu.addAction(self.configAction)
 		self.trayIconMenu.addSeparator()
 		self.trayIconMenu.addAction(self.quitAction)
-		self.trayIcon = QtGui.QSystemTrayIcon(self)
+		self.trayIcon = QtWidgets.QSystemTrayIcon(self)
 		self.trayIcon.setContextMenu(self.trayIconMenu)
 		self.trayIcon.setIcon( getIcon( 'mail.png' ) )
-		QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('activated(QSystemTrayIcon::ActivationReason)'), self.onActivation )
-#		QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('messageClicked()'), self.onMessageClicked )
+		# QtCore.QObject.trayIcon.activated(QtWidgets.QSystemTrayIcon.ActivationReason).connect( self.onActivation )
+		self.trayIcon.activated.connect( self.onActivation )
+		# QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('messageClicked()'), self.onMessageClicked )
 
 	def onActivation(self, reason) :
-#		print 'onActivation'
-		if reason != QtGui.QSystemTrayIcon.Context :
+		# print( 'onActivation' )
+		if reason != QtWidgets.QSystemTrayIcon.Context :
 			if form.isHidden() :
 				form.refresh()
 				form.showNormal()	# form.show() ?
@@ -96,21 +100,20 @@ class sysTray(QtGui.QWidget):
 				form.hide()
 
 	def onConfig(self) :
-#		print 'config!'
+		# print( 'config!' )
 		ConfigForm(self).show()
 
-#	def onMessageClicked(self) :
-#		print 'clicked!!'
+	# def onMessageClicked(self) :
+	# 	print( 'clicked!!' )
 
 	def setToolTip( self, tip ) :
 		self.trayIcon.setToolTip( tip )
 
 	def onAbout(self) :
-#		print 'about!'
-		BrowserForm(self, "PopTray Minus - About",
-u"""
-<h2>PopTray Minus v1.4</h2>
-<h4>Copyright (c) 2009-2017 lenik terenin</h4>
+		# print( 'about!' )
+		BrowserForm(self, "PopTray Minus - About", u"""
+<h2>PopTray Minus v1.5</h2>
+<h4>Copyright (c) 2009-2023 lenik terenin</h4>
 
 <p>If you're looking at this text, you have already figured out how
 to right-click a context menu from the icon in the tray =)
@@ -192,63 +195,63 @@ his book and code snippets.
 """
 		).show()
 
-class SortedTreeWidgetItem( QtGui.QTreeWidgetItem ) :
+class SortedTreeWidgetItem( QtWidgets.QTreeWidgetItem ) :
 
 	def __lt__( self, other ) :
 		column = self.treeWidget().sortColumn()
 		if column == 0 or column == 4  :
 			try :		# sort scores or sizes as floats
 				return float(self.text(column).strip().split(' ')[0]) < float(other.text(column).strip().split(' ')[0])
-			except:
+			except ValueError:
 				pass	# not a float maybe
-		return QtGui.QTreeWidgetItem.__lt__( self, other )
+		return QtWidgets.QTreeWidgetItem.__lt__( self, other )
 
 	def __ge__( self, other ) :
-		raise 'holy shit'
+		raise Exception('holy shit')
 
-class ConfigPage( QtGui.QWidget ) :
+class ConfigPage( QtWidgets.QWidget ) :
 	def __init__( self, parent = None ) :
 		super( ConfigPage, self ).__init__( parent )
 
 		# server parms
-		form_layout = QtGui.QFormLayout()
+		form_layout = QtWidgets.QFormLayout()
 
-		self.name_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 0, QtGui.QFormLayout.FieldRole, self.name_edit);
-		self.mailbox_combo = QtGui.QComboBox(self);
-		form_layout.setWidget( 1, QtGui.QFormLayout.FieldRole, self.mailbox_combo);
-		self.server_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 2, QtGui.QFormLayout.FieldRole, self.server_edit);
-		self.port_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 3, QtGui.QFormLayout.FieldRole, self.port_edit);
-		self.user_edit = QtGui.QLineEdit(self);
-		form_layout.setWidget( 4, QtGui.QFormLayout.FieldRole, self.user_edit);
-		self.pass_edit = QtGui.QLineEdit(self);
-		self.pass_edit.setEchoMode(QtGui.QLineEdit.Password);	#*******************
-		form_layout.setWidget( 5, QtGui.QFormLayout.FieldRole, self.pass_edit);
-		self.interval_combo = QtGui.QComboBox(self);
-		form_layout.setWidget( 6, QtGui.QFormLayout.FieldRole, self.interval_combo);
+		self.name_edit = QtWidgets.QLineEdit(self)
+		form_layout.setWidget( 0, QtWidgets.QFormLayout.FieldRole, self.name_edit)
+		self.mailbox_combo = QtWidgets.QComboBox(self)
+		form_layout.setWidget( 1, QtWidgets.QFormLayout.FieldRole, self.mailbox_combo)
+		self.server_edit = QtWidgets.QLineEdit(self)
+		form_layout.setWidget( 2, QtWidgets.QFormLayout.FieldRole, self.server_edit)
+		self.port_edit = QtWidgets.QLineEdit(self)
+		form_layout.setWidget( 3, QtWidgets.QFormLayout.FieldRole, self.port_edit)
+		self.user_edit = QtWidgets.QLineEdit(self)
+		form_layout.setWidget( 4, QtWidgets.QFormLayout.FieldRole, self.user_edit)
+		self.pass_edit = QtWidgets.QLineEdit(self)
+		self.pass_edit.setEchoMode(QtWidgets.QLineEdit.Password)	#*******************
+		form_layout.setWidget( 5, QtWidgets.QFormLayout.FieldRole, self.pass_edit)
+		self.interval_combo = QtWidgets.QComboBox(self)
+		form_layout.setWidget( 6, QtWidgets.QFormLayout.FieldRole, self.interval_combo)
 
-		buddy_list = ( self.name_edit, self.mailbox_combo, self.port_edit, self.server_edit, self.user_edit, self.pass_edit, self.interval_combo );
+		buddy_list = ( self.name_edit, self.mailbox_combo, self.port_edit, self.server_edit, self.user_edit, self.pass_edit, self.interval_combo )
 		buddy_labels = ('&Name:', 'P&rotocol :', '&Server :', '&Port :', '&Username :', '&Password :', '&Interval :')
 		for i,v in enumerate( buddy_labels ) :
-			label = QtGui.QLabel( v, self )
-			form_layout.setWidget( i, QtGui.QFormLayout.LabelRole, label );
+			label = QtWidgets.QLabel( v, self )
+			form_layout.setWidget( i, QtWidgets.QFormLayout.LabelRole, label )
 			label.setBuddy( buddy_list[i] )
 
 		# black lists
-		self.black_from = QtGui.QPlainTextEdit( self  )
-		black_from_layout = QtGui.QVBoxLayout()
-		black_from_layout.addWidget( QtGui.QLabel( 'Blacklist if "From" contains (one line - one pattern):', self ) )
+		self.black_from = QtWidgets.QPlainTextEdit( self  )
+		black_from_layout = QtWidgets.QVBoxLayout()
+		black_from_layout.addWidget( QtWidgets.QLabel( 'Blacklist if "From" contains (one line - one pattern):', self ) )
 		black_from_layout.addWidget( self.black_from )
 
-		self.black_to = QtGui.QPlainTextEdit( self  )
-		black_to_layout = QtGui.QVBoxLayout()
-		black_to_layout.addWidget( QtGui.QLabel( 'Blacklist if "To" contains (one line - one pattern):', self ) )
+		self.black_to = QtWidgets.QPlainTextEdit( self  )
+		black_to_layout = QtWidgets.QVBoxLayout()
+		black_to_layout.addWidget( QtWidgets.QLabel( 'Blacklist if "To" contains (one line - one pattern):', self ) )
 		black_to_layout.addWidget( self.black_to )
 
 		# page layout
-		layout = QtGui.QVBoxLayout( self )
+		layout = QtWidgets.QVBoxLayout( self )
 		layout.addLayout( form_layout )
 		layout.addLayout( black_from_layout )
 		layout.addLayout( black_to_layout )
@@ -261,8 +264,8 @@ class ConfigPage( QtGui.QWidget ) :
 		else :
 			self.mailbox_combo.setCurrentIndex( 1 )
 		self.mailbox_combo.setEditable( False )
-#		QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL('activated(int)'), self.onMailbox )
-		QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL( 'currentIndexChanged(int)'), self.onMailbox )
+		# QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL('activated(int)'), self.onMailbox )
+		QtCore.QObject.mailbox_combo.currentIndexChanged(int).connect( self.onMailbox )
 
 		interval = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
 		for i,v in enumerate( ( 5, 10, 15, 20, 30, 40, 60 ) ) :
@@ -277,7 +280,7 @@ class ConfigPage( QtGui.QWidget ) :
 		self.user_edit.setText( str(config.value( 'user' ).toString()) )
 		try :
 			self.pass_edit.setText( base64.b64decode( str(config.value( 'passwd' ).toString()) ) )
-		except :
+		except Exception:
 			pass
 
 		self.black_from.setPlainText( '\n'.join( loadConfigList( 'black_from_contains' ) ) )
@@ -287,7 +290,7 @@ class ConfigPage( QtGui.QWidget ) :
 		self.black_to.setToolTip( 'messages with matching substring in "To:" will be deleted' )
 
 	def onMailbox( self, selection ) :
-#		print 'activated: ', selection
+		# print( 'activated: ', selection )
 		if selection == 1 :
 			self.port_edit.setText( '995' )
 		else :
@@ -298,7 +301,7 @@ class ConfigPage( QtGui.QWidget ) :
 		pats = list( i for i in pats if len(i) )
 		too_short = list( i for i in pats if len(i) < 4 )
 		if len(too_short) :
-			raise Exception, 'Blacklisted "%s" patterns are too short,\nsupposed to be at least 5 characters long:\n%s' % (name, str(too_short))
+			raise Exception( 'Blacklisted "%s" patterns are too short,\nsupposed to be at least 5 characters long:\n%s' % (name, str(too_short)))
 
 		return pats
 
@@ -310,20 +313,20 @@ class ConfigPage( QtGui.QWidget ) :
 		passwd = str(self.pass_edit.text())
 		try :
 			socket.gethostbyname( host )
-		except Exception, (errno, errmsg) :
-			raise Exception, host + ' -- ' + errmsg
+		except Exception as e :
+			raise Exception( host + ' -- ' + str(e))
 
 		try :
 			port = int(port)
-		except :
-			raise Exception, "port value should be numeric"
+		except ValueError:
+			raise Exception( "port value should be numeric")
 
 		bf = self.extract_patterns( self.black_from, 'From' )
-		bt = self.extract_patterns( self. black_to, 'To' )
+		bt = self.extract_patterns( self.black_to, 'To' )
 
 		for i,v in (( host, 'Server address'), ( user, 'User name' ) ) :
 			if not len(i) :
-				raise Exception, '%s can not be empty' % v
+				raise Exception( '%s can not be empty' % v )
 
 	def save_data( self ) :
 		name = str(self.name_edit.text())
@@ -357,25 +360,28 @@ class ConfigPage( QtGui.QWidget ) :
 			return self.user_edit.text()
 		return '%s@%s' % (self.user_edit.text(), self.server_edit.text())
 
-class ConfigForm( QtGui.QDialog ) :
+# self.connect(self.lineedit, SIGNAL("returnPressed()"), self.updateUi)
+# self.lineedit.returnPressed.connect(self.updateUi)
+
+class ConfigForm( QtWidgets.QDialog ) :
 	def __init__( self, parent = None ) :
 		super( ConfigForm, self ).__init__( parent )
 
 		self.setWindowTitle( 'PopTray Minus - Settings' )
 		self.resize( 400, 540 )
 
-		plus_button = QtGui.QPushButton( getIcon( 'plus.png' ), '' )
-		self.minus_button = QtGui.QPushButton( getIcon( 'minus.png' ), '' )
-		button_box = QtGui.QDialogButtonBox( QtGui.QDialogButtonBox.Ok | QtGui.QDialogButtonBox.Cancel )
-		button_box.button( QtGui.QDialogButtonBox.Ok ).setDefault(True)
+		self.plus_button = QtWidgets.QPushButton( getIcon( 'plus.png' ), '' )
+		self.minus_button = QtWidgets.QPushButton( getIcon( 'minus.png' ), '' )
+		self.button_box = QtWidgets.QDialogButtonBox( QtWidgets.QDialogButtonBox.Ok | QtWidgets.QDialogButtonBox.Cancel )
+		self.button_box.button( QtWidgets.QDialogButtonBox.Ok ).setDefault(True)
 
-		buttons_layout = QtGui.QHBoxLayout()
-		buttons_layout.addWidget( plus_button )
+		buttons_layout = QtWidgets.QHBoxLayout()
+		buttons_layout.addWidget( self.plus_button )
 		buttons_layout.addWidget( self.minus_button )
 		buttons_layout.addStretch()
-		buttons_layout.addWidget( button_box )
+		buttons_layout.addWidget( self.button_box )
 
-		self.tab_widget = QtGui.QTabWidget()
+		self.tab_widget = QtWidgets.QTabWidget()
 		self.pages = list()
 
 		for i in range( len(config.childGroups()) ) :
@@ -387,15 +393,16 @@ class ConfigForm( QtGui.QDialog ) :
 			config.endGroup()
 
 		# overall layout
-		layout = QtGui.QVBoxLayout( self )
+		layout = QtWidgets.QVBoxLayout( self )
 		layout.addWidget( self.tab_widget )
 		layout.addLayout( buttons_layout )
 
-		self.connect( button_box, QtCore.SIGNAL("accepted()"), self, QtCore.SLOT("accept()"))
-		self.connect( button_box, QtCore.SIGNAL("rejected()"), self, QtCore.SLOT("reject()"))
+		# self.connect( button_box, QtCore.SIGNAL("accepted()"), self, QtCore.SLOT("accept()"))
+		self.button_box.accepted.connect( self.accept )
+		self.button_box.rejected.connect( self.reject )
 
-		self.connect( plus_button, QtCore.SIGNAL('clicked()'), self.addAccount )
-		self.connect( self.minus_button, QtCore.SIGNAL('clicked()'), self.deleteAccount )
+		self.plus_button.clicked.connect( self.addAccount )
+		self.minus_button.clicked.connect( self.deleteAccount )
 
 	def addAccount( self ) :
 		page = ConfigPage()
@@ -417,9 +424,9 @@ class ConfigForm( QtGui.QDialog ) :
 			page = self.tab_widget.widget( i )
 			try :
 				page.validate_data()
-			except Exception, e :
+			except Exception as e :
 				self.tab_widget.setCurrentWidget( page )
-				QtGui.QMessageBox.warning( self, 'Error', str(e) )
+				QtWidgets.QMessageBox.warning( self, 'Error', str(e) )
 				return
 
 		for i in range(count) :
@@ -438,71 +445,77 @@ class ConfigForm( QtGui.QDialog ) :
 
 		try :
 			form.timer.setInterval( 1000 )	# 1 sec to form.reload
-		except :
+		except Exception:
 			pass	# there may be no form open yet
 
-		QtGui.QDialog.accept(self)
+		# QtWidgets.QDialog.accept(self)
+		super(ConfigForm, self).accept()
 
-class MainForm( QtGui.QDialog ) :
+	def reject(self):
+		super(ConfigForm, self).reject()
+
+class MainForm( QtWidgets.QDialog ) :
 	def __init__( self, parent = None ) :
 		super( MainForm, self ).__init__( parent )
 
 		self.tables = list()
 		self.mailboxen = list()
-		self.tab_widget = QtGui.QTabWidget()
+		self.tab_widget = QtWidgets.QTabWidget()
 
 		self.setup_tabs()
 		self.setup_boxes()
 
-		self.reload_button = QtGui.QPushButton( 'reload', self )
+		self.reload_button = QtWidgets.QPushButton( 'reload', self )
 		self.reload_button.setIcon( getIcon( 'reload.png' ) )
-		self.delete_button = QtGui.QPushButton( 'delete', self )
+		self.delete_button = QtWidgets.QPushButton( 'delete', self )
 		self.delete_button.setIcon( getIcon( 'delete.png' ) )
-		self.preview_button = QtGui.QPushButton( 'preview', self )
+		self.preview_button = QtWidgets.QPushButton( 'preview', self )
 		self.preview_button.setIcon( getIcon( 'preview.png' ) )
-		button_layout = QtGui.QHBoxLayout()
+		button_layout = QtWidgets.QHBoxLayout()
 		button_layout.addWidget( self.preview_button )
 		button_layout.addWidget( self.delete_button )
 		button_layout.addStretch()
 		button_layout.addWidget( self.reload_button )
-		layout = QtGui.QVBoxLayout()
+		layout = QtWidgets.QVBoxLayout()
 		layout.addWidget( self.tab_widget )
 		layout.addLayout( button_layout )
 		self.setLayout( layout )
 
-		self.connect( self.preview_button, QtCore.SIGNAL( 'clicked()' ), self.onPreview )
-		self.connect( self.delete_button, QtCore.SIGNAL( 'clicked()' ), self.onDelete )
-		self.connect( self.reload_button, QtCore.SIGNAL( 'clicked()' ), self.onReload )
+		self.preview_button.clicked.connect( self.onPreview )
+		self.delete_button.clicked.connect( self.onDelete )
+		self.reload_button.clicked.connect( self.onReload )
 
-		self.connect( self.tab_widget, QtCore.SIGNAL( 'currentChanged(int)' ), self.tabChanged )
+		self.tab_widget.currentChanged.connect( self.tabChanged )
+		# self.tab_widget.currentChanged(int).connect( self.tabChanged )
+
 #		self.connect( self.table, QtCore.SIGNAL( 'itemSelectionChanged()' ), self.onSelectionChange )
 
 #		self.table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
 #		self.connect( self.table, QtCore.SIGNAL('customContextMenuRequested(QPoint)'), self.onContext)
 
 		self.setWindowTitle( 'PopTray Minus' )
-		geometry = QtGui.QApplication.desktop().availableGeometry()
+		geometry = QtWidgets.QApplication.desktop().availableGeometry()
 		width = max( geometry.width() / 2, 780 )
 		height = max( geometry.height() / 2, 300 )
 		self.resize( width, height )
-#		print width, height
+#		print( width, height )
 
 		self.onSelectionChange()
 
 		self.timer = QtCore.QTimer()
-		self.connect( self.timer, QtCore.SIGNAL( 'timeout()'), self.auto_reload )
+		self.timer.timeout.connect( self.auto_reload )
 		self.timer.setInterval( 1000 )	# 1 sec
 		self.timer.setSingleShot( True )
 		self.timer.start()
 
 	def tabChanged( self ) :
-#		print 'changed'
+		# print( 'changed' )
 		self.refresh()
 
 	def setup_boxes( self ) :
 		boxes = list()
 		boxnum = dict( (str(b.account),n) for n,b in enumerate(self.mailboxen) )
-#		print boxnum
+#		print( boxnum )
 
 		load_settings()
 
@@ -533,43 +546,45 @@ class MainForm( QtGui.QDialog ) :
 				msg_num = len(self.mailboxen[i].messages)
 				if msg_num :
 					title = '%s - %d' % (title, msg_num)
-			except :
+			except Exception:
 				pass
 
 			if i < len(self.tables) :
 				self.tab_widget.setTabText( i, title )
 			else :
-				table = QtGui.QTreeWidget()
-				self.tab_widget.addTab( table, title )
-				self.tables.append( table )
+				self.table = QtWidgets.QTreeWidget()
+				self.tab_widget.addTab( self.table, title )
+				self.tables.append( self.table )
 
-				self.connect( table, QtCore.SIGNAL( 'itemSelectionChanged()' ), self.onSelectionChange )
+				self.table.itemSelectionChanged.connect( self.onSelectionChange )
 
-				table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
-				self.connect( table, QtCore.SIGNAL('customContextMenuRequested(QPoint)'), self.onContext)
+				self.table.setContextMenuPolicy( QtCore.Qt.CustomContextMenu)		# enable context menu
 
-				table.setHeaderLabels( headers )
+				# self.table.customContextMenuRequested(QtCore.QPoint).connect( self.onContextEvent )
+				self.table.customContextMenuRequested.connect( self.onContext )
 
-				table.addTopLevelItem( QtGui.QTreeWidgetItem(
-						[ '-20.0', 'werwer', 'asdasdads', '2009-00-00 00:00:00', '1000.0 kB' ] ) )
-				table.resizeColumnToContents( 0 )
-				table.resizeColumnToContents( 3 )
-				table.resizeColumnToContents( 4 )
-				table.clear()
+				self.table.setHeaderLabels( headers )
 
-				table.setColumnWidth( 1, self.size().width()/4 )
-				table.setColumnWidth( 2, self.size().width()/4 )
-				table.setAlternatingRowColors(True)
-				table.setSelectionMode( QtGui.QTreeWidget.ExtendedSelection )
-				table.sortByColumn(3, QtCore.Qt.DescendingOrder)
-				table.setSortingEnabled(True)
+				self.table.addTopLevelItem( QtWidgets.QTreeWidgetItem(
+					[ '-20.0', 'werwer', 'asdasdads', '2009-00-00 00:00:00', '1000.0 kB' ] ))
+				self.table.resizeColumnToContents( 0 )
+				self.table.resizeColumnToContents( 3 )
+				self.table.resizeColumnToContents( 4 )
+				self.table.clear()
+
+				self.table.setColumnWidth( 1, self.size().width()/4 )
+				self.table.setColumnWidth( 2, self.size().width()/4 )
+				self.table.setAlternatingRowColors(True)
+				self.table.setSelectionMode( QtWidgets.QTreeWidget.ExtendedSelection )
+				self.table.sortByColumn(3, QtCore.Qt.DescendingOrder)
+				self.table.setSortingEnabled(True)
 
 		for i in range(len(settings),len(self.tables)) :
 			self.tables.pop()
 			self.tab_widget.removeTab( i )
 
 	def closeEvent( self, event ) :
-#		print 'use menu quit()'
+		# print( 'use menu quit()' )
 		event.ignore()
 		self.hide()
 
@@ -579,7 +594,7 @@ class MainForm( QtGui.QDialog ) :
 		if (event.modifiers() == QtCore.Qt.NoModifier and event.key() == QtCore.Qt.Key_Return ) :
 			self.onPreview()
 		if (event.modifiers() != QtCore.Qt.NoModifier or event.key() != QtCore.Qt.Key_Escape ) :
-			QtGui.QDialog.keyPressEvent( self, event )
+			QtWidgets.QDialog.keyPressEvent( self, event )
 		else :
 			event.ignore()
 			self.hide()
@@ -616,12 +631,12 @@ class MainForm( QtGui.QDialog ) :
 		for i in self.mailboxen[index].messages :
 			item = SortedTreeWidgetItem( table, self.mailboxen[index].messages[i] )
 			item.setData( 1, QtCore.Qt.UserRole, QtCore.QVariant(i))
-			score = float(self.mailboxen[index].messages[i][0]) * 10
+			score = int(float(self.mailboxen[index].messages[i][0]) * 10)
 			if score < 0 :		# ham -- go green
-				item.setBackgroundColor( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
+				item.setBackground( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
 			else :			# spam -- go red
-				item.setBackgroundColor( 0, QtGui.QColor( 255, max(255 - score,0), max(255 - score,0) ) )
-			item.setTextAlignment( 4, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter );
+				item.setBackground( 0, QtGui.QColor( 255, max(255 - score,0), max(255 - score,0) ) )
+			item.setTextAlignment( 4, QtCore.Qt.AlignRight | QtCore.Qt.AlignVCenter )
 			table.addTopLevelItem( item )
 		table.setSortingEnabled(True)
 		self.onSelectionChange()		# can't delete if no UIDL support
@@ -641,7 +656,7 @@ class MainForm( QtGui.QDialog ) :
 		for i in ( self.reload_button, self.preview_button, self.delete_button ) :
 			i.setEnabled( False )
 
-		if mb == None :		# reload button, not autoreload
+		if mb is None :		# reload button, not autoreload
 			index = self.tab_widget.currentIndex()
 			mb = self.mailboxen[index]
 			load_settings()
@@ -651,19 +666,19 @@ class MainForm( QtGui.QDialog ) :
 		try :
 			mb.rescan()
 			err_msg = None
-		except poplib.error_proto, e :
+		except poplib.error_proto as e :
 			if debug :
-				print 'POP3 error:', e
+				print( 'POP3 error:', e )
 			err_msg = self.strip_err( e[0] )
-		except socket.gaierror, (errno, errmsg) :
+		except socket.gaierror as e :
 			if debug :
-				print 'POP3 error:', errmsg
-			err_msg = errmsg
-		except socket.error, errmsg :
+				print( 'POP3 error:', str(e) )
+			err_msg = str(e)
+		except socket.error as e :
 			if debug :
-				print 'POP3 error:', errmsg
-			err_msg = str(errmsg)
-		except :
+				print( 'POP3 error:', str(e) )
+			err_msg = str(e)
+		except Exception:
 			err_msg = traceback.format_exc()
 
 		if err_msg :
@@ -672,18 +687,18 @@ class MainForm( QtGui.QDialog ) :
 			tray.trayIcon.showMessage( 'POP3 error', err_msg )
 			tray.trayIcon.setIcon( getIcon( 'mail-mark-important.png' ) )
 		else :
-				if mb.new_mail :	# new mail has arrived?
-#					tray.trayIcon.setIcon( self.create_icon('mail-mark-unread.png', len( mailbox.messages ) ) )
-					tray.trayIcon.showMessage( 'New mail', "%d new messages\n%s" % (mb.new_mail, mb.title()) )
-#				else :
-#					tray.trayIcon.setIcon( self.create_icon('mail.png', len( mailbox.messages ) ) )
+			if mb.new_mail :	# new mail has arrived?
+				# tray.trayIcon.setIcon( self.create_icon('mail-mark-unread.png', len( mailbox.messages ) ) )
+				tray.trayIcon.showMessage( 'New mail', "%d new messages\n%s" % (mb.new_mail, mb.title()) )
+			# else :
+				# tray.trayIcon.setIcon( self.create_icon('mail.png', len( mailbox.messages ) ) )
 
-				msg_num = sum( (len(mb.messages) for mb in self.mailboxen ) )
-				tray.trayIcon.setIcon( self.create_icon('mail.png', msg_num ) )
+			msg_num = sum( (len(mb.messages) for mb in self.mailboxen ) )
+			tray.trayIcon.setIcon( self.create_icon('mail.png', msg_num ) )
 
-				info = ( (len(mb.messages), mb.new_mail, mb.title(), mb.date ) for mb in self.mailboxen )
+			info = ( (len(mb.messages), mb.new_mail, mb.title(), mb.date ) for mb in self.mailboxen )
 
-				tray.setToolTip( '\n---\n'.join( "%d emails, %d new\n%s\n%s" % i for i in info ) )
+			tray.setToolTip( '\n---\n'.join( "%d emails, %d new\n%s\n%s" % i for i in info ) )
 
 		self.refresh()
 
@@ -712,43 +727,43 @@ class MainForm( QtGui.QDialog ) :
 		self.timer.start()
 
 	def onDelete( self ) :
-#		print 'delete'
+		# print( 'delete' )
 		table = self.tab_widget.currentWidget()
 		index = self.tab_widget.currentIndex()
 		items = table.selectedItems()
 		if len(self.mailboxen[index].uidl) == 0 or len(items) == 0 :
 			return
 
-		reply = QtGui.QMessageBox.question(self, 'PopTray Minus - Delete Messages',
+		reply = QtWidgets.QMessageBox.question(self, 'PopTray Minus - Delete Messages',
 				'Do you really want to delete %d messages?' % len(items),
-				QtGui.QMessageBox.Yes | QtGui.QMessageBox.No )
-		if reply != QtGui.QMessageBox.Yes:
+				QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No )
+		if reply != QtWidgets.QMessageBox.Yes:
 			return
 
 #		for i in items :
-#			print i.data( 1, QtCore.Qt.UserRole ).toString()
+#			print( i.data( 1, QtCore.Qt.UserRole ).toString() )
 		self.mailboxen[index].killed = set( str( i.data( 1, QtCore.Qt.UserRole ).toString()) for i in items )
-#		print mailbox.killed
+#		print( mailbox.killed )
 
 		self.reload()
 		self.mailboxen[index].killed = set()
 
 	def onPreview( self ) :
-#		print 'preview',
+		# print( 'preview', )
 		table = self.tab_widget.currentWidget()
 		index = self.tab_widget.currentIndex()
 		item = table.currentItem()
 		item_id = str(item.data( 1, QtCore.Qt.UserRole ).toString())
-#		print item_id
+#		print( item_id )
 		if item :
 			try :
 				text = self.mailboxen[index].get_message( item_id )
-			except Exception, e :
-				text = '<font color=red>error : ' + str( e ) + '</font>'
+			except Exception as e :
+				text = '<font color=red>error : ' + str(e) + '</font>'
 			BrowserForm( self, 'PopTray - Preview', text ).show()
 
 	def onReload( self ) :
-#		print 'reload'
+		# print( 'reload' )
 		self.reload()
 
 	def updatePreviewDelete( self, preview, delete ) :
@@ -763,16 +778,16 @@ class MainForm( QtGui.QDialog ) :
 		self.updatePreviewDelete( self.preview_button, self.delete_button )
 
 	def onContext( self, point ) :
-#		print 'context!', point
-		previewAction = QtGui.QAction( getIcon('preview.png'), self.tr('Preview'), self )
-		QtCore.QObject.connect( previewAction, QtCore.SIGNAL("triggered()"), self.onPreview )
-		deleteAction = QtGui.QAction( getIcon('delete.png'), self.tr('Delete'), self )
-		QtCore.QObject.connect( deleteAction, QtCore.SIGNAL("triggered()"), self.onDelete )
+		# print( 'context!', point )
+		previewAction = QtWidgets.QAction( getIcon('preview.png'), self.tr('Preview'), self )
+		QtCore.QObject.previewAction.triggered.connect( self.onPreview )
+		deleteAction = QtWidgets.QAction( getIcon('delete.png'), self.tr('Delete'), self )
+		QtCore.QObject.deleteAction.triggered.connect( self.onDelete )
 
 		self.updatePreviewDelete( previewAction, deleteAction )
 
 #		offset = QtCore.QPoint( 3, 26 )
-		contextMenu = QtGui.QMenu(self)
+		contextMenu = QtWidgets.QMenu(self)
 		contextMenu.addAction( previewAction )
 		contextMenu.addSeparator()
 		contextMenu.addAction( deleteAction )
@@ -781,21 +796,21 @@ class MainForm( QtGui.QDialog ) :
 		contextMenu.exec_( table.mapToGlobal( point + offset ))
 
 
-class BrowserForm(QtGui.QDialog):
+class BrowserForm(QtWidgets.QDialog):
 
 	def __init__(self, parent=None, title = '', text=''):
 		super(BrowserForm, self).__init__(parent)
 #		self.setAttribute(QtCore.Qt.WA_GroupLeader)
 		self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-		browser = QtGui.QTextBrowser()
+		browser = QtWidgets.QTextBrowser()
 		browser.setOpenExternalLinks(True)
 		browser.setText( text )
-		layout = QtGui.QVBoxLayout()
+		layout = QtWidgets.QVBoxLayout()
 		layout.setMargin(0)
 		layout.addWidget(browser)
 		self.setLayout(layout)
 		self.resize(500, 500)
-		QtGui.QShortcut(QtGui.QKeySequence("Escape"), self, self.close)
+		QtWidgets.QShortcut(QtWidgets.QKeySequence("Escape"), self, self.close)
 		self.setWindowTitle( title )
 
 class Mailbox :
@@ -816,47 +831,55 @@ class Mailbox :
 		return '%s@%s' % (self.account['user'], self.account['host'])
 
 	def decode_stuff( self, stuff ) :
-		lines = list()
-		for (data, encoding) in email.Header.decode_header( stuff ) :
-			if encoding :
-				try :
-					data = unicode( data,  encoding )
-				except :
-					pass	# bad encoding, do nothing
-			lines.append( data )
-		return ' '.join( lines )
+		return '' if stuff is None else stuff
+		# lines = list()
+		# for (data, encoding) in email.Header.decode_header( stuff ) :
+		# 	if encoding :
+		# 		try :
+		# 			data = str( data,  encoding=encoding )
+		# 		except Exception:
+		# 			pass	# bad encoding, do nothing
+		# 	lines.append( data )
+		# return ' '.join( lines )
 
 	def check_error( self, data ) :
 		if not data[0].startswith( '+OK' ) :
 			raise poplib.error_proto( (data[0], ) )
 
 	def is_blacklisted( self, msg_from, msg_to, msg_subj ) :
-			for name in self.account['black_from_contains'] :
-				if msg_from.lower().find( name.lower() ) != -1 :
-					return True
-			for name in self.account['black_to_contains'] :
-				if msg_to.lower().find( name.lower() ) != -1 :
-					return True
-			return False
+		for name in self.account['black_from_contains'] :
+			if msg_from.lower().find( name.lower() ) != -1 :
+				return True
+		for name in self.account['black_to_contains'] :
+			if msg_to.lower().find( name.lower() ) != -1 :
+				return True
+		return False
 
 	def convert_to_unicode( self, string ) :
-		if type(string) != types.UnicodeType :
+		if not isinstance( string, str) :
 			try :
+				if string is None:
+					return ''
 				enc = chardet.detect( string )
-				if enc['encoding'] != 'ascii' and enc['encoding'] != None :
+				if enc['encoding'] != 'ascii' and enc['encoding'] is not None :
 					if debug :
-						print 'encoding: ', enc
-					try :
-						string = unicode( string, enc['encoding'] )
-					except :
-						pass	# bad encoding, do nothing
-			except UnicodeDecodeError, e :
+						print( 'encoding: ', enc )
+					encoding = 'utf-8' if enc['confidence'] < 0.5 else enc['encoding']
+					string = string.decode( encoding, errors='ignore')
+					# try :
+					# 	string = str( string, encoding=enc['encoding'] )
+					# except Exception:
+					# 	pass	# bad encoding, do nothing
+				else :
+					string = string.decode('utf-8')
+			except UnicodeDecodeError as e :
+				# import IPython; IPython.embed()
 				if debug :
-					print type(string)
+					print( type(string) )
 				string = '*****' + str(e)
 #			except TypeError, e :
 #				if debug :
-#					print type(msg_subj)
+#					print( type(msg_subj) )
 #				msg_subj = '*****' + str(e)
 		return string
 
@@ -865,9 +888,13 @@ class Mailbox :
 		for (k,i) in enumerate(nums) :
 			tray.setToolTip( 'processing message %d of %d\n%s' % ( k, len(nums), self.title()) )
 			if debug :
-				print '-' * 80
+				print( '-' * 80 )
 			header = mbox.top( i, 0)[1]
-			msg = email.message_from_string( '\n'.join( header ) )
+			# print( header )
+			separator = b'\n' if isinstance( header[0], bytes) else '\n'
+			# header = [self.convert_to_unicode(h) for h in mbox.top( i, 0)[1]]
+			msg = email.message_from_string( self.convert_to_unicode( separator.join( header )))
+			# import IPython; IPython.embed()
 
 			try :
 				msg_from = self.decode_stuff( msg['from'] )
@@ -879,20 +906,21 @@ class Mailbox :
 				msg_to = '** FAILED TO DECODE **'
 			try :
 				msg_subj = self.decode_stuff( msg['subject'] )
-			except :	# email.errors.HeaderParseError in email.Header.decode_header( stuff )
+			except Exception:	# email.errors.HeaderParseError in email.Header.decode_header( stuff )
 				msg_subj = '** FAILED TO DECODE **'
 
 			try :
 				msg_size = '%.1f k ' % ( float( mbox.list( i ).split()[2] ) / 1024 )
-			except :
+			except Exception:
 				msg_size = ''
 
 			try :
-				for ds in ['delivery-date','date'] :
+				for ds in ['date','delivery-date'] :
 					if ds in msg :
-						msg_date = email.Utils.parsedate_tz( msg[ds] )
-				msg_date = datetime.datetime.fromtimestamp( email.Utils.mktime_tz( msg_date ) ).strftime( "%Y-%m-%d %H:%M:%S" )
-			except :
+						msg_date = msg[ds]
+						break
+				msg_date = email.utils.parsedate_to_datetime( msg_date ).strftime('%Y-%m-%d %H:%M:%S')
+			except Exception:
 				msg_date = 'None'
 
 			msg_score = msg['x-spam-score']
@@ -908,20 +936,20 @@ class Mailbox :
 			msg_subj = self.convert_to_unicode( msg_subj )
 
 			if debug :
-				print u'From: %s\nTo  : %s\nSubj: %s\nDate: %s\nSize: %s' % (msg_from,  msg_to,  msg_subj, msg_date, msg_size)
-				print u'Score:', msg['X-SPAM-SCORE']
+				print( u'From: %s\nTo  : %s\nSubj: %s\nDate: %s\nSize: %s' % (msg_from,  msg_to,  msg_subj, msg_date, msg_size) )
+				print( u'Score:', msg['X-SPAM-SCORE'] )
 
 			app.processEvents()
 
 			if self.is_blacklisted( msg_from, msg_to, msg_subj ) :
 				if debug :
-					print '**DELETED**'
+					print( '**DELETED**' )
 				mbox.dele( i )
 				continue
 
 			try :
 				msg_score = '%5.1f' % ( float( msg_score ) / 10.0 )
-			except :
+			except Exception:
 				msg_score = '0.0'
 
 			if len(self.uidl) :
@@ -931,7 +959,7 @@ class Mailbox :
 
 			if msg_id in self.killed :
 				if debug :
-					print '**KILLED**'
+					print( '**KILLED**' )
 				mbox.dele( i )
 				continue
 
@@ -950,13 +978,13 @@ class Mailbox :
 
 	def get_uidl( self, mbox ) :
 		uidl = mbox.uidl()
-#		print uidl
+#		print( uidl )
 		try :
 			self.check_error( uidl )
 			uidl = uidl[1]
-		except :
+		except Exception:
 			uidl = []
-#		print uidl
+#		print( uidl )
 		return uidl
 
 	def get_message( self, msg_id ) :
@@ -982,8 +1010,8 @@ class Mailbox :
 
 		mbox = self.open_mbox()
 		if debug :
-			print "%d emails, %d bytes" % mbox.stat(), datetime.datetime.now().strftime( "%F %T" )
-#		print mbox.list()
+			print( "%d emails, %d bytes" % mbox.stat(), datetime.datetime.now().strftime( "%F %T" ) )
+#		print( mbox.list() )
 
 		uidl = self.get_uidl( mbox )
 
@@ -991,20 +1019,20 @@ class Mailbox :
 			num_to_uidl = dict( u.split() for u in uidl )
 			num_to_uidl = dict( (int(n),num_to_uidl[n]) for n in num_to_uidl )
 			uidl_to_num = dict( (num_to_uidl[n],n) for n in num_to_uidl )
-#			print num_to_uidl
-#			print uidl_to_num
+#			print( num_to_uidl )
+#			print( uidl_to_num )
 
 			old_messages = set( n for n in self.messages )
-#			print old_messages
+#			print( old_messages )
 
 			new_messages = set( n for n in uidl_to_num )
-#			print new_messages
+#			print( new_messages )
 
 			gone = old_messages - new_messages
 			came = new_messages - old_messages
-#			print 'gone :', gone
-#			print 'came :', came
-#			print 'kill : ', self.killed
+#			print( 'gone :', gone )
+#			print( 'came :', came )
+#			print( 'kill : ', self.killed )
 
 #			self.new_mail = len(came)
 
@@ -1014,7 +1042,7 @@ class Mailbox :
 			nums = sorted( list( int(uidl_to_num[i]) for i in came | self.killed ) )
 			if len(nums) :
 				if debug :
-					print 'loading: ', nums
+					print( 'loading: ', nums )
 
 			self.uidl = num_to_uidl
 		else :
@@ -1026,7 +1054,7 @@ class Mailbox :
 		self.date = datetime.datetime.now().strftime( "%F %R" )
 
 		if debug :
-			print '-' * 80
+			print( '-' * 80 )
 		mbox.quit()
 
 PIXMAPS['mail.png'] = ICONS['mail.png'] = """\
@@ -1299,7 +1327,7 @@ def getIcon(name):
 	icon = ICONS.get(name)
 	if icon is None:
 		return QtGui.QIcon(name)
-	if isinstance(icon, basestring):
+	if isinstance(icon, str):	# ???
 		pixmap = QtGui.QPixmap()
 		pixmap.loadFromData(base64.b64decode(icon))
 		icon = QtGui.QIcon(pixmap)
@@ -1310,7 +1338,7 @@ def getPixmap(name):
 	image = PIXMAPS.get(name)
 	if image is None:
 		return QtGui.QPixmap(name)
-	if isinstance(image, basestring):
+	if isinstance(image, str):	# ???
 		pixmap = QtGui.QPixmap()
 		pixmap.loadFromData(base64.b64decode(image))
 #		PIXMAPS[name] = image = pixmap
@@ -1322,22 +1350,22 @@ def loadConfigList( name ) :
 	size = config.beginReadArray( name )
 	for i in range(size) :
 		config.setArrayIndex(i)
-		config_list.append( str(config.value("pattern").toString()) )
+		config_list.append( str(config.value("pattern")) )
 	config.endArray()
 	return config_list
 
 def saveConfigList( name, config_list ) :
-	config.beginWriteArray( name );
+	config.beginWriteArray( name )
 	for i,v in enumerate( config_list ) :
-		config.setArrayIndex(i);
-		config.setValue("pattern", QtCore.QVariant(v) );
-	config.endArray();
+		config.setArrayIndex(i)
+		config.setValue("pattern", QtCore.QVariant(v) )
+	config.endArray()
 
 def fixConfig() :
 	# convert old configs and remove old settings
 	for i in ('host', 'user', 'pass', 'interval' ) :
 		if config.contains( i ) :
-			val = str(config.value( i ).toString())
+			val = str(config.value( i ))
 			config.beginGroup( 'account0' )
 			config.setValue( i, QtCore.QVariant(val) )
 			config.endGroup()
@@ -1358,47 +1386,49 @@ def load_settings() :
 		config.beginGroup( 'account%d' % i )
 		if config.contains( 'host' ) :
 			acc = {}
-			acc['name'] = str(config.value( 'name' ).toString())
-			acc['host'] = str(config.value( 'host' ).toString())
-			acc['port'] = int(config.value( 'port', QtCore.QVariant(110) ).toInt()[0])
-			acc['user'] = str(config.value( 'user' ).toString())
+			acc['name'] = str(config.value( 'name' ))
+			acc['host'] = str(config.value( 'host' ))
+			acc['port'] = int(config.value( 'port', QtCore.QVariant(110) ))
+			acc['user'] = str(config.value( 'user' ))
 			if config.contains( 'pass' ) :
-				passwd = base64.b64encode( str(config.value( 'pass' ).toString()) )
+				passwd = base64.b64encode( str(config.value( 'pass' )) )
 				config.setValue( 'passwd', QtCore.QVariant( passwd ) )
 				config.remove( 'pass' )
 			try :
-				acc['pass'] = str(base64.b64decode(str(config.value( 'passwd' ).toString())))
-			except :
+				acc['pass'] = base64.b64decode(str(config.value( 'passwd' ))).decode('utf-8')
+			except Exception:
 				acc['pass'] = ''		# b64decode failed ?
-			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
-			acc['protocol'] = str(config.value( 'protocol', QtCore.QVariant( 'POP3' ) ).toString())
+			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ))
+			acc['protocol'] = str(config.value( 'protocol', QtCore.QVariant( 'POP3' ) ))
 			acc['black_from_contains'] = loadConfigList( 'black_from_contains' )
 			acc['black_to_contains'] = loadConfigList( 'black_to_contains' )
 			settings.append( acc )
 		config.endGroup()
 
-app = QtGui.QApplication(sys.argv)
-app.setOrganizationDomain('server-pro.com')
-app.setApplicationName('PopTray Minus')
-app.setWindowIcon(getIcon('mail_q_16x16.png'))
+if __name__ == '__main__':
 
-debug = '-debug' in sys.argv
+	app = QtWidgets.QApplication(sys.argv)
+	app.setOrganizationDomain('lazydroid.com')
+	app.setApplicationName('PopTray Minus')
+	app.setWindowIcon(getIcon('mail_q_16x16.png'))
 
-app.setQuitOnLastWindowClosed( False )
+	debug = True	# '-debug' in sys.argv
 
-#config = QtCore.QSettings( 'PopTray', 'poptray' )
-config = QtCore.QSettings( os.path.expanduser("~") + '/.poptrayrc', QtCore.QSettings.NativeFormat )
+	app.setQuitOnLastWindowClosed( False )
 
-fixConfig()	# convert old configs and remove old settings
+	#config = QtCore.QSettings( 'PopTray', 'poptray' )
+	config = QtCore.QSettings( os.path.expanduser("~") + '/.poptrayrc', QtCore.QSettings.NativeFormat )
 
-if not len(config.allKeys()) :
-	if not ConfigForm().exec_() :	# ConfigForm checks for valid host
-		sys.exit()
+	fixConfig()	# convert old configs and remove old settings
 
-load_settings()
-#print settings
+	if not len(config.allKeys()) :
+		if not ConfigForm().exec_() :	# ConfigForm checks for valid host
+			sys.exit()
 
-form = MainForm()
-tray = sysTray()
+	load_settings()
+	print( 'Settings: %s' % json.dumps(settings, indent='\t') )
 
-sys.exit( app.exec_() )
+	form = MainForm()
+	tray = sysTray()
+
+	sys.exit( app.exec_() )
