@@ -37,6 +37,20 @@ def qapp( ptm ) :
 
 
 @pytest.fixture
+def globals_stub( ptm, monkeypatch ) :
+	# tray / app are only bound by the __main__ block
+	monkeypatch.setattr( ptm, 'tray', type( 'tray', (), { 'setToolTip': staticmethod( lambda tip : None ) } ), raising = False )
+	monkeypatch.setattr( ptm, 'app', type( 'app', (), { 'processEvents': staticmethod( lambda : None ) } ), raising = False )
+
+
+@pytest.fixture( autouse = True )
+def cache_home( monkeypatch, tmp_path ) :
+	# keep the message cache out of the real ~/.cache
+	monkeypatch.setenv( 'XDG_CACHE_HOME', str(tmp_path / 'cache') )
+	return tmp_path / 'cache' / 'poptrayminus'
+
+
+@pytest.fixture
 def config( ptm, tmp_path ) :
 	# QSettings backed by a throwaway ini file, installed as the module-level global
 	settings = ptm.QtCore.QSettings( str(tmp_path / 'poptrayrc'), ptm.QtCore.QSettings.IniFormat )

@@ -36,6 +36,12 @@ The 1.5.0 conversion left a few things behind that have since been fixed:
 * removing more than one account no longer takes out the wrong tabs in the main window, and an account with no name shows `user@host` instead of `None`.
 * if the desktop has no system tray, the main window is shown right away and closing it quits -- the app used to start up completely invisible, with no way out but `kill`.
 
+### message cache
+
+The headers of the messages already seen are kept in `~/.cache/poptrayminus/{host}_{md5(user)}.json.gz` (`$XDG_CACHE_HOME` is honoured), so a big mailbox is not pulled through POP3 all over again on every start -- only the UIDLs that are not in the cache get fetched. The cache is written after every scan, is per account, and is simply ignored (and refilled) when it is missing, unreadable or written by another version. Servers with no UIDL support get no cache, as message numbers are not stable enough to key anything on.
+
+It is gzipped json rather than a pickle on purpose: `pickle.load()` would run whatever ends up in that file, and `zcat` on the cache still shows you what is in there.
+
 ### distribution
 I tried to distribute this by myself before, and that was quite a pain in the behind, though, poptrayminus has found its way into a few linux distributions (thank you, guys).
 

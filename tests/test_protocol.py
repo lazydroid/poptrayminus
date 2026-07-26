@@ -49,13 +49,6 @@ def make_message( sender = 'friend@example.com', to = 'me@example.com' ) :
 
 
 @pytest.fixture
-def globals_stub( ptm, monkeypatch ) :
-	# tray / app are only bound by the __main__ block
-	monkeypatch.setattr( ptm, 'tray', type( 'tray', (), { 'setToolTip': staticmethod( lambda tip : None ) } ), raising = False )
-	monkeypatch.setattr( ptm, 'app', type( 'app', (), { 'processEvents': staticmethod( lambda : None ) } ), raising = False )
-
-
-@pytest.fixture
 def mbox( ptm ) :
 	return FakePOP3( { 1: ('UID0001', MESSAGE), 2: ('UID0002', MESSAGE) } )
 

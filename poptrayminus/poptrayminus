@@ -27,6 +27,7 @@
 
 import poplib,  email, email.header, base64, json, traceback
 import os, sys, datetime, socket, chardet, time
+import gzip, hashlib, re
 
 try :	# fix around 'line too long' issue https://bugs.python.org/issue16041
 	if poplib._MAXLINE == 2048 :
@@ -57,6 +58,12 @@ debug = False
 def to_text( data ) :
 	# poplib hands back bytes, but the ui and the message maps work with str
 	return data.decode( 'utf-8', errors = 'replace' ) if isinstance( data, bytes ) else str(data)
+
+CACHE_VERSION = 1
+
+def cache_dir() :
+	base = os.environ.get( 'XDG_CACHE_HOME' ) or os.path.join( os.path.expanduser('~'), '.cache' )
+	return os.path.join( base, 'poptrayminus' )
 
 def hide_passwords( accounts ) :
 	return [ dict( acc, **{ 'pass': '***' } ) for acc in accounts ]
@@ -853,6 +860,55 @@ class Mailbox :
 		self.uidl = {}
 		self.date = 'never checked'
 		self.elapsed = 200	# 200min, should be bigger than max possible interval
+		self.cache_loaded = False
+
+	def cache_file( self ) :
+		# user names are arbitrary, and often whole email addresses, so they are hashed
+		who = hashlib.md5( self.account['user'].encode('utf-8') ).hexdigest()
+		host = re.sub( r'[^\w.-]', '_', self.account['host'] ) or 'unknown'
+		return os.path.join( cache_dir(), '%s_%s.json.gz' % (host, who) )
+
+	def load_cache( self ) :
+		# headers of the messages seen last time, so a 40k mailbox is not read all over again
+		self.cache_loaded = True
+		try :
+			with gzip.open( self.cache_file(), 'rt', encoding = 'utf-8' ) as ff :
+				data = json.load( ff )
+		except FileNotFoundError :
+			return
+		except Exception as e :
+			log_this( 'cache read failed: %s' % e, 2 )
+			return
+
+		if not isinstance( data, dict ) or data.get( 'version' ) != CACHE_VERSION :
+			return		# written by another version, refetch everything
+		messages = data.get( 'messages' )
+		if not isinstance( messages, dict ) :
+			return
+
+		self.messages = dict(
+			(k, list(v)) for (k,v) in messages.items()
+			if isinstance( v, list ) and len(v) == 6
+		)
+		self.date = str( data.get( 'date', self.date ) )
+		if debug :
+			print( 'cache: %d messages from %s' % (len(self.messages), self.cache_file()) )
+
+	def save_cache( self ) :
+		data = {
+			'version': CACHE_VERSION,
+			'host': self.account['host'],
+			'date': self.date,
+			'messages': self.messages,
+		}
+		name = self.cache_file()
+		try :
+			os.makedirs( cache_dir(), exist_ok = True )
+			with gzip.open( name + '.tmp', 'wt', encoding = 'utf-8' ) as ff :
+				json.dump( data, ff )
+			os.replace( name + '.tmp', name )	# never leave a half written cache behind
+		except Exception as e :
+			log_this( 'cache write failed: %s' % e, 2 )
 
 	def title( self ) :
 		if self.account['name'] :
@@ -1045,6 +1101,9 @@ class Mailbox :
 	def rescan( self ) :
 		app.processEvents()		# just in case
 
+		if not self.cache_loaded :
+			self.load_cache()
+
 		mbox = self.open_mbox()
 		if debug :
 			print( "%d emails, %d bytes" % mbox.stat(), datetime.datetime.now().strftime( "%F %T" ) )
@@ -1089,6 +1148,9 @@ class Mailbox :
 		self.load_messages( mbox, nums )
 
 		self.date = datetime.datetime.now().strftime( "%F %R" )
+
+		if len(self.uidl) :
+			self.save_cache()	# without UIDL there is nothing stable to key the messages on
 
 		if debug :
 			print( '-' * 80 )
