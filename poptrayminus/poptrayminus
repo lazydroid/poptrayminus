@@ -742,7 +742,7 @@ class MainForm( QtWidgets.QDialog ) :
 
 #		for i in items :
 #			print( i.data( 1, QtCore.Qt.UserRole ).toString() )
-		self.mailboxen[index].killed = set( str( i.data( 1, QtCore.Qt.UserRole )) for i in items )
+		self.mailboxen[index].killed = set( i.data( 1, QtCore.Qt.UserRole ) for i in items )
 #		print( mailbox.killed )
 
 		self.reload()
@@ -753,7 +753,7 @@ class MainForm( QtWidgets.QDialog ) :
 		table = self.tab_widget.currentWidget()
 		index = self.tab_widget.currentIndex()
 		item = table.currentItem()
-		item_id = str(item.data( 1, QtCore.Qt.UserRole ))
+		item_id = item.data( 1, QtCore.Qt.UserRole )
 #		print( item_id )
 		if item :
 			try :
@@ -806,11 +806,11 @@ class BrowserForm(QtWidgets.QDialog):
 		browser.setOpenExternalLinks(True)
 		browser.setText( text )
 		layout = QtWidgets.QVBoxLayout()
-		layout.setMargin(0)
+		layout.setContentsMargins(0, 0, 0, 0)
 		layout.addWidget(browser)
 		self.setLayout(layout)
 		self.resize(500, 500)
-		QtWidgets.QShortcut(QtWidgets.QKeySequence("Escape"), self, self.close)
+		QtWidgets.QShortcut(QtGui.QKeySequence("Escape"), self, self.close)
 		self.setWindowTitle( title )
 
 class Mailbox :
