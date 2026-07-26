@@ -71,15 +71,21 @@ def log_this( s, sev = 0 ) :
 class nullTrayIcon :
 	# the reload/notify code talks to the tray unconditionally, so when the
 	# desktop has no tray at all it gets one of these instead of a pile of checks
-	def setIcon( self, icon ) : pass
-	def showMessage( self, title, text ) : pass
-	def show( self ) : pass
+	def setIcon( self, icon ) :
+		pass
+
+	def showMessage( self, title, text ) :
+		pass
+
+	def show( self ) :
+		pass
 
 class nullTray :
 	def __init__( self ) :
 		self.trayIcon = nullTrayIcon()
 
-	def setToolTip( self, tip ) : pass
+	def setToolTip( self, tip ) :
+		pass
 
 class sysTray(QtWidgets.QWidget):
 
