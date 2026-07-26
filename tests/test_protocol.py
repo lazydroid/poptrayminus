@@ -44,6 +44,10 @@ class FakePOP3 :
 MESSAGE = b'From: friend@example.com\nTo: me@example.com\nSubject: hi\nDate: Thu, 1 Jan 2015 12:00:00 +0000\nX-Spam-Score: -20\n\nhello there\n'
 
 
+def make_message( sender = 'friend@example.com', to = 'me@example.com' ) :
+	return MESSAGE.replace( b'friend@example.com', sender.encode() ).replace( b'me@example.com', to.encode() )
+
+
 @pytest.fixture
 def globals_stub( ptm, monkeypatch ) :
 	# tray / app are only bound by the __main__ block
@@ -101,6 +105,64 @@ def test_rescan_deletes_killed_message( ptm, mbox, monkeypatch, globals_stub ) :
 	mb.rescan()
 
 	assert mbox.deleted == [2]
+	assert sorted( mb.messages ) == ['UID0001']
+
+
+def test_rescan_deletes_blacklisted_sender( ptm, monkeypatch, globals_stub ) :
+	mbox = FakePOP3( {
+		1: ('UID0001', make_message()),
+		2: ('UID0002', make_message( sender = 'Spammer@Example.NET' )),
+	} )
+	mb = ptm.Mailbox( make_account( black_from_contains = ['spammer@'] ) )
+	monkeypatch.setattr( mb, 'open_mbox', lambda : mbox )
+
+	mb.rescan()
+
+	assert mbox.deleted == [2]
+	assert sorted( mb.messages ) == ['UID0001']
+
+
+def test_rescan_deletes_blacklisted_recipient( ptm, monkeypatch, globals_stub ) :
+	mbox = FakePOP3( {
+		1: ('UID0001', make_message( to = 'victim@example.com' )),
+		2: ('UID0002', make_message()),
+	} )
+	mb = ptm.Mailbox( make_account( black_to_contains = ['victim@'] ) )
+	monkeypatch.setattr( mb, 'open_mbox', lambda : mbox )
+
+	mb.rescan()
+
+	assert mbox.deleted == [1]
+	assert sorted( mb.messages ) == ['UID0002']
+
+
+def test_rescan_keeps_everything_without_patterns( ptm, monkeypatch, globals_stub ) :
+	mbox = FakePOP3( {
+		1: ('UID0001', make_message( sender = 'spammer@example.net' )),
+		2: ('UID0002', make_message()),
+	} )
+	mb = ptm.Mailbox( make_account() )
+	monkeypatch.setattr( mb, 'open_mbox', lambda : mbox )
+
+	mb.rescan()
+
+	assert mbox.deleted == []
+	assert sorted( mb.messages ) == ['UID0001', 'UID0002']
+
+
+def test_blacklisted_message_stays_deleted_on_reload( ptm, monkeypatch, globals_stub ) :
+	# the server drops the message, so a second pass must not resurrect it
+	mbox = FakePOP3( {
+		1: ('UID0001', make_message()),
+		2: ('UID0002', make_message( sender = 'spammer@example.net' )),
+	} )
+	mb = ptm.Mailbox( make_account( black_from_contains = ['spammer@'] ) )
+	monkeypatch.setattr( mb, 'open_mbox', lambda : mbox )
+
+	mb.rescan()
+	del mbox.messages[2]		# QUIT commits the DELE
+	mb.rescan()
+
 	assert sorted( mb.messages ) == ['UID0001']
 
 
