@@ -14,7 +14,18 @@ If you want to develop and package this yourself, you'll need to install `devscr
 
 ### tests
 
-There is a small pytest suite in `tests/`, covering the settings storage and the message filtering logic. Run it with `python3 -m pytest tests` (needs `pytest`, `PyQt5` and `chardet`); the GUI parts run headless via `QT_QPA_PLATFORM=offscreen`, which the tests set for you.
+There is a small pytest suite in `tests/`, covering the settings storage, the POP3 handling and the message filtering logic. Run it with `python3 -m pytest tests` (needs `pytest`, `PyQt5` and `chardet`); the GUI parts run headless via `QT_QPA_PLATFORM=offscreen`, which the tests set for you.
+
+### py3 / qt5 conversion leftovers
+
+The 1.5.0 conversion left a few things behind that have since been fixed:
+
+* Qt4 settings API -- `QSettings.value()` returns a plain object on Qt5, so `.toString()` / `.toInt()` and the `QVariant` wrappers around `setValue()` / `setData()` are gone.
+* signal connections written as `QtCore.QObject.<widget>.<signal>(type).connect(...)`, which never connected anything -- the protocol combo did not update the port field and the context menu actions did nothing.
+* `QVBoxLayout.setMargin()` and `QtWidgets.QKeySequence`, both Qt4-only, used to kill the app whenever the preview or about window was opened.
+* python3 `base64` wants bytes -- saving an account from the settings dialog used to die silently, without writing anything.
+* python3 integer division -- window and column sizes are computed with `//` now, `resize()` and `setColumnWidth()` do not take floats.
+* python3 `poplib` returns bytes -- UIDL and message data are decoded before use, so preview and delete work again (they were permanently disabled before, as the `+OK` check silently failed).
 
 ### distribution
 I tried to distribute this by myself before, and that was quite a pain in the behind, though, poptrayminus has found its way into a few linux distributions (thank you, guys).
