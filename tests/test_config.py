@@ -56,6 +56,19 @@ def test_load_settings_applies_defaults( ptm, config ) :
 	assert acc['pass'] == ''		# nothing stored, b64decode fails
 
 
+def test_load_settings_migrates_plaintext_password( ptm, config ) :
+	config.beginGroup( 'account0' )
+	config.setValue( 'host', 'mail.example.com' )
+	config.setValue( 'pass', 'secret' )
+	config.endGroup()
+
+	ptm.load_settings()
+
+	assert ptm.settings[0]['pass'] == 'secret'
+	assert not config.contains( 'account0/pass' )
+	assert str(config.value( 'account0/passwd' )) == base64.b64encode( b'secret' ).decode('ascii')
+
+
 def test_fix_config_moves_toplevel_keys_into_account0( ptm, config ) :
 	config.setValue( 'host', 'mail.example.com' )
 	config.setValue( 'user', 'someone' )
@@ -111,12 +124,12 @@ def test_config_page_protocol_change_updates_port( ptm, qapp, config ) :
 	assert page.port_edit.text() == '110'
 
 
-@pytest.mark.xfail( reason = 'save_data() calls base64.b64encode() on a str', raises = TypeError, strict = True )
 def test_config_page_save_data_round_trip( ptm, qapp, config ) :
 	page = ptm.ConfigPage()
 	page.name_edit.setText( 'work' )
 	page.server_edit.setText( 'mail.example.com' )
 	page.user_edit.setText( 'someone' )
+	page.pass_edit.setText( 'sécret' )
 	page.mailbox_combo.setCurrentIndex( 1 )
 	page.interval_combo.setCurrentIndex( 4 )		# 30 min
 	page.black_from.setPlainText( 'spammer@example.com' )
@@ -131,6 +144,11 @@ def test_config_page_save_data_round_trip( ptm, qapp, config ) :
 	assert acc['host'] == 'mail.example.com'
 	assert acc['port'] == 995
 	assert acc['user'] == 'someone'
+	assert acc['pass'] == 'sécret'
 	assert acc['interval'] == 30
 	assert acc['protocol'] == 'POP3 SSL'
 	assert acc['black_from_contains'] == ['spammer@example.com']
+
+	config.beginGroup( 'account0' )
+	assert ptm.ConfigPage().pass_edit.text() == 'sécret'
+	config.endGroup()

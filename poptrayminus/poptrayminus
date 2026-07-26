@@ -279,7 +279,7 @@ class ConfigPage( QtWidgets.QWidget ) :
 		self.port_edit.setText( str(config.value( 'port', '110' )) )
 		self.user_edit.setText( str(config.value( 'user', '' )) )
 		try :
-			self.pass_edit.setText( base64.b64decode( str(config.value( 'passwd', '' )) ) )
+			self.pass_edit.setText( base64.b64decode( str(config.value( 'passwd', '' )) ).decode('utf-8') )
 		except Exception:
 			pass
 
@@ -333,7 +333,7 @@ class ConfigPage( QtWidgets.QWidget ) :
 		host = str(self.server_edit.text())
 		port = str(self.port_edit.text())
 		user = str(self.user_edit.text())
-		passwd = base64.b64encode( str(self.pass_edit.text()) )
+		passwd = base64.b64encode( str(self.pass_edit.text()).encode('utf-8') ).decode('ascii')
 		interval = int( str( self.interval_combo.currentText() ).split()[0] )
 		protocol = str( self.mailbox_combo.currentText() )
 
@@ -1391,7 +1391,7 @@ def load_settings() :
 			acc['port'] = int(config.value( 'port', 110 ))
 			acc['user'] = str(config.value( 'user' ))
 			if config.contains( 'pass' ) :
-				passwd = base64.b64encode( str(config.value( 'pass' )) )
+				passwd = base64.b64encode( str(config.value( 'pass' )).encode('utf-8') ).decode('ascii')
 				config.setValue( 'passwd', passwd )
 				config.remove( 'pass' )
 			try :
