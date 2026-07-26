@@ -258,28 +258,28 @@ class ConfigPage( QtWidgets.QWidget ) :
 
 		self.mailbox_combo.addItem( getIcon('internet.png'), 'POP3' )
 		self.mailbox_combo.addItem( getIcon('internet.png'), 'POP3 SSL' )
-		protocol = config.value( 'protocol', QtCore.QVariant( 'POP3' ) ).toString()
+		protocol = str(config.value( 'protocol', 'POP3' ))
 		if protocol == 'POP3' :
 			self.mailbox_combo.setCurrentIndex( 0 )
 		else :
 			self.mailbox_combo.setCurrentIndex( 1 )
 		self.mailbox_combo.setEditable( False )
 		# QtCore.QObject.connect( self.mailbox_combo, QtCore.SIGNAL('activated(int)'), self.onMailbox )
-		QtCore.QObject.mailbox_combo.currentIndexChanged(int).connect( self.onMailbox )
+		self.mailbox_combo.currentIndexChanged.connect( self.onMailbox )
 
-		interval = int(config.value( 'interval', QtCore.QVariant( 15 ) ).toInt()[0])
+		interval = int(config.value( 'interval', 15 ))
 		for i,v in enumerate( ( 5, 10, 15, 20, 30, 40, 60 ) ) :
 			self.interval_combo.addItem( '%d min' % v )
 			if interval >= v :
 				self.interval_combo.setCurrentIndex( i )
 		self.interval_combo.setEditable( False )
 
-		self.name_edit.setText( str(config.value( 'name' ).toString()) )
-		self.server_edit.setText( str(config.value( 'host' ).toString()) )
-		self.port_edit.setText( str(config.value( 'port', QtCore.QVariant('110') ).toString()) )
-		self.user_edit.setText( str(config.value( 'user' ).toString()) )
+		self.name_edit.setText( str(config.value( 'name', '' )) )
+		self.server_edit.setText( str(config.value( 'host', '' )) )
+		self.port_edit.setText( str(config.value( 'port', '110' )) )
+		self.user_edit.setText( str(config.value( 'user', '' )) )
 		try :
-			self.pass_edit.setText( base64.b64decode( str(config.value( 'passwd' ).toString()) ) )
+			self.pass_edit.setText( base64.b64decode( str(config.value( 'passwd', '' )) ) )
 		except Exception:
 			pass
 
@@ -337,13 +337,13 @@ class ConfigPage( QtWidgets.QWidget ) :
 		interval = int( str( self.interval_combo.currentText() ).split()[0] )
 		protocol = str( self.mailbox_combo.currentText() )
 
-		config.setValue( 'name', QtCore.QVariant( name ) )
-		config.setValue( 'host', QtCore.QVariant( host ) )
-		config.setValue( 'port', QtCore.QVariant( port ) )
-		config.setValue( 'user', QtCore.QVariant( user ) )
-		config.setValue( 'passwd', QtCore.QVariant( passwd ) )
-		config.setValue( 'interval', QtCore.QVariant( interval ) )
-		config.setValue( 'protocol', QtCore.QVariant( protocol ) )
+		config.setValue( 'name', name )
+		config.setValue( 'host', host )
+		config.setValue( 'port', port )
+		config.setValue( 'user', user )
+		config.setValue( 'passwd', passwd )
+		config.setValue( 'interval', interval )
+		config.setValue( 'protocol', protocol )
 
 		bf = self.extract_patterns( self.black_from, 'From' )
 		bt = self.extract_patterns( self. black_to, 'To' )
@@ -630,7 +630,7 @@ class MainForm( QtWidgets.QDialog ) :
 		table.setSortingEnabled(False)
 		for i in self.mailboxen[index].messages :
 			item = SortedTreeWidgetItem( table, self.mailboxen[index].messages[i] )
-			item.setData( 1, QtCore.Qt.UserRole, QtCore.QVariant(i))
+			item.setData( 1, QtCore.Qt.UserRole, i )
 			score = int(float(self.mailboxen[index].messages[i][0]) * 10)
 			if score < 0 :		# ham -- go green
 				item.setBackground( 0, QtGui.QColor( max(255 + score, 0), 255, max(255 + score, 0) ) )
@@ -742,7 +742,7 @@ class MainForm( QtWidgets.QDialog ) :
 
 #		for i in items :
 #			print( i.data( 1, QtCore.Qt.UserRole ).toString() )
-		self.mailboxen[index].killed = set( str( i.data( 1, QtCore.Qt.UserRole ).toString()) for i in items )
+		self.mailboxen[index].killed = set( str( i.data( 1, QtCore.Qt.UserRole )) for i in items )
 #		print( mailbox.killed )
 
 		self.reload()
@@ -753,7 +753,7 @@ class MainForm( QtWidgets.QDialog ) :
 		table = self.tab_widget.currentWidget()
 		index = self.tab_widget.currentIndex()
 		item = table.currentItem()
-		item_id = str(item.data( 1, QtCore.Qt.UserRole ).toString())
+		item_id = str(item.data( 1, QtCore.Qt.UserRole ))
 #		print( item_id )
 		if item :
 			try :
@@ -780,9 +780,9 @@ class MainForm( QtWidgets.QDialog ) :
 	def onContext( self, point ) :
 		# print( 'context!', point )
 		previewAction = QtWidgets.QAction( getIcon('preview.png'), self.tr('Preview'), self )
-		QtCore.QObject.previewAction.triggered.connect( self.onPreview )
+		previewAction.triggered.connect( self.onPreview )
 		deleteAction = QtWidgets.QAction( getIcon('delete.png'), self.tr('Delete'), self )
-		QtCore.QObject.deleteAction.triggered.connect( self.onDelete )
+		deleteAction.triggered.connect( self.onDelete )
 
 		self.updatePreviewDelete( previewAction, deleteAction )
 
@@ -1358,7 +1358,7 @@ def saveConfigList( name, config_list ) :
 	config.beginWriteArray( name )
 	for i,v in enumerate( config_list ) :
 		config.setArrayIndex(i)
-		config.setValue("pattern", QtCore.QVariant(v) )
+		config.setValue("pattern", v )
 	config.endArray()
 
 def fixConfig() :
@@ -1367,7 +1367,7 @@ def fixConfig() :
 		if config.contains( i ) :
 			val = str(config.value( i ))
 			config.beginGroup( 'account0' )
-			config.setValue( i, QtCore.QVariant(val) )
+			config.setValue( i, val )
 			config.endGroup()
 			config.remove( i )
 
@@ -1388,18 +1388,18 @@ def load_settings() :
 			acc = {}
 			acc['name'] = str(config.value( 'name' ))
 			acc['host'] = str(config.value( 'host' ))
-			acc['port'] = int(config.value( 'port', QtCore.QVariant(110) ))
+			acc['port'] = int(config.value( 'port', 110 ))
 			acc['user'] = str(config.value( 'user' ))
 			if config.contains( 'pass' ) :
 				passwd = base64.b64encode( str(config.value( 'pass' )) )
-				config.setValue( 'passwd', QtCore.QVariant( passwd ) )
+				config.setValue( 'passwd', passwd )
 				config.remove( 'pass' )
 			try :
 				acc['pass'] = base64.b64decode(str(config.value( 'passwd' ))).decode('utf-8')
 			except Exception:
 				acc['pass'] = ''		# b64decode failed ?
-			acc['interval'] = int(config.value( 'interval', QtCore.QVariant( 15 ) ))
-			acc['protocol'] = str(config.value( 'protocol', QtCore.QVariant( 'POP3' ) ))
+			acc['interval'] = int(config.value( 'interval', 15 ))
+			acc['protocol'] = str(config.value( 'protocol', 'POP3' ))
 			acc['black_from_contains'] = loadConfigList( 'black_from_contains' )
 			acc['black_to_contains'] = loadConfigList( 'black_to_contains' )
 			settings.append( acc )
