@@ -12,6 +12,10 @@ I don't have any GPG-protected channel for distribution, so you may just downloa
 
 If you want to develop and package this yourself, you'll need to install `devscripts`. The original project configuration was created using `dch --create` and the installation package can be created using `debuild --no-tgz-check` running in `poptrayminus` folder (where all these `debian/` folders and `setup.py` scripts are)
 
+### tests
+
+There is a small pytest suite in `tests/`, covering the settings storage and the message filtering logic. Run it with `python3 -m pytest tests` (needs `pytest`, `PyQt5` and `chardet`); the GUI parts run headless via `QT_QPA_PLATFORM=offscreen`, which the tests set for you.
+
 ### distribution
 I tried to distribute this by myself before, and that was quite a pain in the behind, though, poptrayminus has found its way into a few linux distributions (thank you, guys).
 
