@@ -234,9 +234,6 @@ class SortedTreeWidgetItem( QtWidgets.QTreeWidgetItem ) :
 				pass	# not a float maybe
 		return QtWidgets.QTreeWidgetItem.__lt__( self, other )
 
-	def __ge__( self, other ) :
-		raise Exception('holy shit')
-
 class ConfigPage( QtWidgets.QWidget ) :
 	def __init__( self, parent = None ) :
 		super( ConfigPage, self ).__init__( parent )
@@ -334,11 +331,9 @@ class ConfigPage( QtWidgets.QWidget ) :
 		return pats
 
 	def validate_data( self ) :
-		name = str(self.name_edit.text())
 		host = str(self.server_edit.text())
 		port = str(self.port_edit.text())
 		user = str(self.user_edit.text())
-		passwd = str(self.pass_edit.text())
 		try :
 			socket.gethostbyname( host )
 		except Exception as e :
@@ -349,8 +344,8 @@ class ConfigPage( QtWidgets.QWidget ) :
 		except ValueError:
 			raise Exception( "port value should be numeric")
 
-		bf = self.extract_patterns( self.black_from, 'From' )
-		bt = self.extract_patterns( self.black_to, 'To' )
+		self.extract_patterns( self.black_from, 'From' )	# raises if a pattern is too short
+		self.extract_patterns( self.black_to, 'To' )
 
 		for i,v in (( host, 'Server address'), ( user, 'User name' ) ) :
 			if not len(i) :

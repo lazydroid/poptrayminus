@@ -16,6 +16,8 @@ If you want to develop and package this yourself, you'll need to install `devscr
 
 There is a small pytest suite in `tests/`, covering the settings storage, the POP3 handling and the message filtering logic. Run it with `python3 -m pytest tests` (needs `pytest`, `PyQt5` and `chardet`); the GUI parts run headless via `QT_QPA_PLATFORM=offscreen`, which the tests set for you.
 
+Every push and pull request runs `flake8` and the suite on python 3.9 and 3.12, see `.github/workflows/ci.yml`.
+
 ### py3 / qt5 conversion leftovers
 
 The 1.5.0 conversion left a few things behind that have since been fixed:
