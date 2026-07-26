@@ -27,6 +27,13 @@ The 1.5.0 conversion left a few things behind that have since been fixed:
 * python3 integer division -- window and column sizes are computed with `//` now, `resize()` and `setColumnWidth()` do not take floats.
 * python3 `poplib` returns bytes -- UIDL and message data are decoded before use, so preview and delete work again (they were permanently disabled before, as the `+OK` check silently failed).
 
+### other fixes
+
+* `-debug` is a command line switch again, it used to be hardwired to `True` -- every run dumped all the message headers and the whole settings dict, including the password, to stdout.
+* encoded headers (`=?utf-8?B?...?=`) are decoded, so non-ascii subjects and names are readable in the message list.
+* removing more than one account no longer takes out the wrong tabs in the main window, and an account with no name shows `user@host` instead of `None`.
+* if the desktop has no system tray, the main window is shown right away and closing it quits -- the app used to start up completely invisible, with no way out but `kill`.
+
 ### distribution
 I tried to distribute this by myself before, and that was quite a pain in the behind, though, poptrayminus has found its way into a few linux distributions (thank you, guys).
 

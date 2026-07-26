@@ -25,7 +25,7 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import poplib,  email, base64, json, traceback
+import poplib,  email, email.header, base64, json, traceback
 import os, sys, datetime, socket, chardet, time
 
 try :	# fix around 'line too long' issue https://bugs.python.org/issue16041
@@ -52,9 +52,14 @@ socket.setdefaulttimeout(timeout)
 
 severity = ( '-', '=', '+', '*' )
 
+debug = False
+
 def to_text( data ) :
 	# poplib hands back bytes, but the ui and the message maps work with str
 	return data.decode( 'utf-8', errors = 'replace' ) if isinstance( data, bytes ) else str(data)
+
+def hide_passwords( accounts ) :
+	return [ dict( acc, **{ 'pass': '***' } ) for acc in accounts ]
 
 def log_this( s, sev = 0 ) :
 	t = time.strftime( "%Y-%m-%d %H:%M:%S", time.localtime(time.time()) )
@@ -62,6 +67,25 @@ def log_this( s, sev = 0 ) :
 	ff = open( os.path.expanduser("~") + '/poptray.log', 'a' )
 	print( t, severity[sev], s, file=ff )
 	ff.close()
+
+class nullTrayIcon :
+	# the reload/notify code talks to the tray unconditionally, so when the
+	# desktop has no tray at all it gets one of these instead of a pile of checks
+	def setIcon( self, icon ) :
+		pass
+
+	def showMessage( self, title, text ) :
+		pass
+
+	def show( self ) :
+		pass
+
+class nullTray :
+	def __init__( self ) :
+		self.trayIcon = nullTrayIcon()
+
+	def setToolTip( self, tip ) :
+		pass
 
 class sysTray(QtWidgets.QWidget):
 
@@ -462,6 +486,7 @@ class MainForm( QtWidgets.QDialog ) :
 	def __init__( self, parent = None ) :
 		super( MainForm, self ).__init__( parent )
 
+		self.quit_on_close = False	# set when there is no tray icon to restore us from
 		self.tables = list()
 		self.mailboxen = list()
 		self.tab_widget = QtWidgets.QTabWidget()
@@ -583,12 +608,15 @@ class MainForm( QtWidgets.QDialog ) :
 				self.table.sortByColumn(3, QtCore.Qt.DescendingOrder)
 				self.table.setSortingEnabled(True)
 
-		for i in range(len(settings),len(self.tables)) :
+		while len(self.tables) > len(settings) :
 			self.tables.pop()
-			self.tab_widget.removeTab( i )
+			self.tab_widget.removeTab( len(self.tables) )
 
 	def closeEvent( self, event ) :
 		# print( 'use menu quit()' )
+		if self.quit_on_close :
+			event.accept()
+			return
 		event.ignore()
 		self.hide()
 
@@ -599,6 +627,8 @@ class MainForm( QtWidgets.QDialog ) :
 			self.onPreview()
 		if (event.modifiers() != QtCore.Qt.NoModifier or event.key() != QtCore.Qt.Key_Escape ) :
 			QtWidgets.QDialog.keyPressEvent( self, event )
+		elif self.quit_on_close :
+			self.close()
 		else :
 			event.ignore()
 			self.hide()
@@ -837,16 +867,22 @@ class Mailbox :
 		return '%s@%s' % (self.account['user'], self.account['host'])
 
 	def decode_stuff( self, stuff ) :
-		return '' if stuff is None else stuff
-		# lines = list()
-		# for (data, encoding) in email.Header.decode_header( stuff ) :
-		# 	if encoding :
-		# 		try :
-		# 			data = str( data,  encoding=encoding )
-		# 		except Exception:
-		# 			pass	# bad encoding, do nothing
-		# 	lines.append( data )
-		# return ' '.join( lines )
+		# headers arrive rfc2047-encoded, as '=?utf-8?B?....?=' words
+		if stuff is None :
+			return ''
+		lines = list()
+		try :
+			parts = email.header.decode_header( to_text( stuff ) )
+		except Exception:
+			return to_text( stuff )	# malformed header, keep it as is
+		for ( data, encoding ) in parts :
+			if isinstance( data, bytes ) :
+				try :
+					data = data.decode( encoding or 'utf-8', errors = 'replace' )
+				except LookupError :
+					data = data.decode( 'utf-8', errors = 'replace' )	# bogus charset
+			lines.append( data )
+		return ''.join( lines )
 
 	def check_error( self, data ) :
 		if not to_text( data[0] ).startswith( '+OK' ) :
@@ -1392,10 +1428,10 @@ def load_settings() :
 		config.beginGroup( 'account%d' % i )
 		if config.contains( 'host' ) :
 			acc = {}
-			acc['name'] = str(config.value( 'name' ))
-			acc['host'] = str(config.value( 'host' ))
+			acc['name'] = str(config.value( 'name', '' ))
+			acc['host'] = str(config.value( 'host', '' ))
 			acc['port'] = int(config.value( 'port', 110 ))
-			acc['user'] = str(config.value( 'user' ))
+			acc['user'] = str(config.value( 'user', '' ))
 			if config.contains( 'pass' ) :
 				passwd = base64.b64encode( str(config.value( 'pass' )).encode('utf-8') ).decode('ascii')
 				config.setValue( 'passwd', passwd )
@@ -1418,7 +1454,7 @@ if __name__ == '__main__':
 	app.setApplicationName('PopTray Minus')
 	app.setWindowIcon(getIcon('mail_q_16x16.png'))
 
-	debug = True	# '-debug' in sys.argv
+	debug = '-debug' in sys.argv
 
 	app.setQuitOnLastWindowClosed( False )
 
@@ -1432,9 +1468,18 @@ if __name__ == '__main__':
 			sys.exit()
 
 	load_settings()
-	print( 'Settings: %s' % json.dumps(settings, indent='\t') )
+	if debug :
+		print( 'Settings: %s' % json.dumps( hide_passwords( settings ), indent='\t') )
 
 	form = MainForm()
-	tray = sysTray()
+
+	if QtWidgets.QSystemTrayIcon.isSystemTrayAvailable() :
+		tray = sysTray()
+	else :
+		# without a tray icon there is no other way to bring the window up
+		tray = nullTray()
+		app.setQuitOnLastWindowClosed( True )
+		form.quit_on_close = True
+		form.show()
 
 	sys.exit( app.exec_() )
