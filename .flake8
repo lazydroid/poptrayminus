@@ -6,4 +6,8 @@ ignore=
     #line break after binary operator
     W504,
     # indentation contains tabs
-    W191
+    W191,
+    # continuation lines, the sources align them by hand
+    E124,E128,
+    # multiple imports on one line
+    E401

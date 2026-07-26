@@ -2,9 +2,10 @@ Source: poptrayminus
 Section: python
 Priority: optional
 Maintainer: lenik, <lenik@lazydroid.com>
-Build-Depends: debhelper (>= 7),
-               python-qt5, python-chardet,
-               python (>= 3.4-4~)
+Build-Depends: debhelper (>= 9),
+               dh-python,
+               python3-pyqt5, python3-chardet,
+               python3-all (>= 3.4)
 Standards-Version: 3.9.2
 X-Python-Version: >= 3.4
 
@@ -12,7 +13,7 @@ X-Python-Version: >= 3.4
 Package: poptrayminus
 Architecture: all
 Section: python
-Depends: python-appindicator, ${misc:Depends}, ${python:Depends}
+Depends: python3-pyqt5, python3-chardet, ${misc:Depends}, ${python3:Depends}
 Description: POP3 mailbox monitor with tray icon notifications and preview/delete functions for spam control
  POP3 mailbox monitor with tray icon notifications and preview/delete functions for spam control PopTray Minus
  is a Linux clone of original PopTray written in Python/Qt. PopTray Minus lives happily in the tray, regularly

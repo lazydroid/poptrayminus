@@ -29,3 +29,4 @@ def test_sorted_item_sorts_scores_numerically( ptm, qapp ) :
 	high = ptm.SortedTreeWidgetItem( tree, [' 10.0', 'a', 'b', 'c', '2.0 k ', 'd'] )
 	tree.sortItems( 0, ptm.QtCore.Qt.AscendingOrder )
 	assert low < high		# lexically '10.0' would come first
+	assert high >= low		# __ge__ used to raise unconditionally
