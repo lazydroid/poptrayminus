@@ -60,6 +60,8 @@ def to_text( data ) :
 	return data.decode( 'utf-8', errors = 'replace' ) if isinstance( data, bytes ) else str(data)
 
 CACHE_VERSION = 1
+CACHE_BODIES = 200			# how many previewed messages to keep
+CACHE_BODY_BYTES = 20 * 1024 * 1024	# ...and how much text they may take up
 
 def cache_dir() :
 	base = os.environ.get( 'XDG_CACHE_HOME' ) or os.path.join( os.path.expanduser('~'), '.cache' )
@@ -856,6 +858,7 @@ class Mailbox :
 		self.account = acc
 		self.new_mail = 0
 		self.messages = {}
+		self.bodies = {}		# previewed message text, keyed by uidl, oldest first
 		self.killed = set()
 		self.uidl = {}
 		self.date = 'never checked'
@@ -890,6 +893,12 @@ class Mailbox :
 			(k, list(v)) for (k,v) in messages.items()
 			if isinstance( v, list ) and len(v) == 6
 		)
+		bodies = data.get( 'bodies' )
+		if isinstance( bodies, dict ) :
+			self.bodies = dict(
+				(k,v) for (k,v) in bodies.items()
+				if isinstance( v, str ) and k in self.messages
+			)
 		self.date = str( data.get( 'date', self.date ) )
 		if debug :
 			print( 'cache: %d messages from %s' % (len(self.messages), self.cache_file()) )
@@ -900,6 +909,7 @@ class Mailbox :
 			'host': self.account['host'],
 			'date': self.date,
 			'messages': self.messages,
+			'bodies': self.bodies,
 		}
 		name = self.cache_file()
 		try :
@@ -909,6 +919,19 @@ class Mailbox :
 			os.replace( name + '.tmp', name )	# never leave a half written cache behind
 		except Exception as e :
 			log_this( 'cache write failed: %s' % e, 2 )
+
+	def remember_body( self, msg_id, text ) :
+		# previews are fetched one at a time, on demand, so they accumulate slowly
+		self.bodies.pop( msg_id, None )		# re-insert, to count as the freshest one
+		self.bodies[ msg_id ] = text
+
+		size = sum( len(b) for b in self.bodies.values() )
+		for key in list( self.bodies ) :	# dicts keep insertion order, oldest first
+			if len(self.bodies) <= CACHE_BODIES and size <= CACHE_BODY_BYTES :
+				break
+			size -= len( self.bodies.pop( key ) )
+
+		self.save_cache()
 
 	def title( self ) :
 		if self.account['name'] :
@@ -1081,6 +1104,12 @@ class Mailbox :
 		return uidl
 
 	def get_message( self, msg_id ) :
+		if not self.cache_loaded :
+			self.load_cache()
+		if msg_id in self.bodies :
+			return self.bodies[ msg_id ]	# already read once, the server has nothing new to say
+
+		keep = False
 		mbox = self.open_mbox()
 		uidl = self.get_uidl( mbox )
 		if len(uidl) :
@@ -1091,11 +1120,15 @@ class Mailbox :
 			data = mbox.top( uidl_to_num[msg_id], 100 )
 			if to_text( data[0] ).startswith( '+OK' ) :
 				text = '\n'.join( to_text( line ) for line in data[1] )
+				keep = True		# only a real message is worth keeping, not an error
 			else :
 				text = to_text( data[0] )
 		else :
 			text = 'no such message'
 		mbox.quit()
+
+		if keep :
+			self.remember_body( msg_id, text )
 		return text
 
 	def rescan( self ) :
@@ -1134,6 +1167,7 @@ class Mailbox :
 
 			for i in gone | self.killed :
 				del self.messages[i]
+				self.bodies.pop( i, None )
 
 			nums = sorted( list( int(uidl_to_num[i]) for i in came | self.killed ) )
 			if len(nums) :
@@ -1143,6 +1177,7 @@ class Mailbox :
 			self.uidl = num_to_uidl
 		else :
 			self.messages = {}
+			self.bodies = {}
 			nums = range( 1, mbox.stat()[0] + 1 )
 
 		self.load_messages( mbox, nums )

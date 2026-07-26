@@ -140,6 +140,92 @@ def test_cached_messages_survive_an_unreachable_server( ptm, monkeypatch, global
 	assert sorted( second.messages ) == ['UID0001']		# the list is not blanked when offline
 
 
+def test_previewed_body_is_cached_and_reused( ptm, monkeypatch, globals_stub ) :
+	messages = { 1: ('UID0001', make_message()) }
+	mb = mailbox( ptm, monkeypatch, counting_mbox( messages ) )
+	mb.rescan()
+	assert 'hello there' in mb.get_message( 'UID0001' )
+
+	mbox = counting_mbox( messages )
+	again = mailbox( ptm, monkeypatch, mbox )	# fresh start, body comes off disk
+	assert 'hello there' in again.get_message( 'UID0001' )
+	assert mbox.topped == []			# the server was never asked
+
+
+def test_bodies_are_capped( ptm, monkeypatch, globals_stub ) :
+	monkeypatch.setattr( ptm, 'CACHE_BODIES', 2 )
+	mb = ptm.Mailbox( make_account() )
+	mb.cache_loaded = True
+
+	for i in range(3) :
+		mb.remember_body( 'UID%04d' % i, 'body %d' % i )
+
+	assert list( mb.bodies ) == ['UID0001', 'UID0002']		# oldest one dropped
+
+
+def test_bodies_are_capped_by_size( ptm, monkeypatch, globals_stub ) :
+	monkeypatch.setattr( ptm, 'CACHE_BODY_BYTES', 100 )
+	mb = ptm.Mailbox( make_account() )
+	mb.cache_loaded = True
+
+	mb.remember_body( 'UID0001', 'x' * 80 )
+	mb.remember_body( 'UID0002', 'y' * 80 )
+
+	assert list( mb.bodies ) == ['UID0002']
+
+
+def test_re_preview_refreshes_the_position( ptm, monkeypatch, globals_stub ) :
+	monkeypatch.setattr( ptm, 'CACHE_BODIES', 2 )
+	mb = ptm.Mailbox( make_account() )
+	mb.cache_loaded = True
+
+	mb.remember_body( 'UID0001', 'one' )
+	mb.remember_body( 'UID0002', 'two' )
+	mb.remember_body( 'UID0001', 'one' )		# read again, so it is not the oldest anymore
+	mb.remember_body( 'UID0003', 'three' )
+
+	assert sorted( mb.bodies ) == ['UID0001', 'UID0003']
+
+
+def test_error_replies_are_not_cached( ptm, monkeypatch, globals_stub ) :
+	mbox = counting_mbox( { 1: ('UID0001', make_message()) } )
+	mbox.top = lambda num, lines : ( b'-ERR no such message', [], 0 )
+	mb = mailbox( ptm, monkeypatch, mbox )
+	mb.cache_loaded = True
+	mb.uidl = { 1: 'UID0001' }
+
+	assert mb.get_message( 'UID0001' ) == '-ERR no such message'
+	assert mb.bodies == {}
+
+
+def test_deleted_message_drops_its_body( ptm, monkeypatch, globals_stub ) :
+	messages = { 1: ('UID0001', make_message()), 2: ('UID0002', make_message()) }
+	mb = mailbox( ptm, monkeypatch, counting_mbox( messages ) )
+	mb.rescan()
+	mb.get_message( 'UID0002' )
+	assert list( mb.bodies ) == ['UID0002']
+
+	del messages[2]
+	monkeypatch.setattr( mb, 'open_mbox', lambda : counting_mbox( messages ) )
+	mb.rescan()
+
+	assert mb.bodies == {}
+
+
+def test_orphaned_bodies_are_dropped_on_load( ptm, cache_home ) :
+	mb = ptm.Mailbox( make_account() )
+	cache_home.mkdir( parents = True )
+	with gzip.open( mb.cache_file(), 'wt', encoding = 'utf-8' ) as ff :
+		json.dump( {
+			'version': ptm.CACHE_VERSION,
+			'messages': { 'UID0001': ['0.0', 'from', 'to', 'date', 'size', 'subj'] },
+			'bodies': { 'UID0001': 'kept', 'UID0009': 'no such message anymore', 'UID0002': 17 },
+		}, ff )
+
+	mb.load_cache()
+	assert mb.bodies == { 'UID0001': 'kept' }
+
+
 def test_missing_cache_is_not_an_error( ptm ) :
 	mb = ptm.Mailbox( make_account() )
 	mb.load_cache()
