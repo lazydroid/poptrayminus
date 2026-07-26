@@ -6,8 +6,6 @@
 
 import base64
 
-import pytest
-
 
 def test_load_save_config_list( ptm, config ) :
 	patterns = ['spammer@example.com', 'another-spammer']
