@@ -16,6 +16,13 @@ If you want to develop and package this yourself, you'll need to install `devscr
 
 There is a small pytest suite in `tests/`, covering the settings storage, the POP3 handling and the message filtering logic. Run it with `python3 -m pytest tests` (needs `pytest`, `PyQt5` and `chardet`); the GUI parts run headless via `QT_QPA_PLATFORM=offscreen`, which the tests set for you.
 
+`tests/dummy_pop3.py` is a small POP3 server with five placeholder messages (encoded headers and spam scores among them), used by the socket level tests and handy for poking at the app by hand:
+
+	python3 tests/dummy_pop3.py --port 1110 --state /tmp/dummy   # then point an account at 127.0.0.1:1110
+	python3 tests/dummy_pop3.py --state /tmp/dummy --extra       # deliver one more message
+
+Deletions live in the state directory and survive a restart, and every command the server sees is appended to `{state}/log`, which is how the tests tell a cached message from a refetched one.
+
 Every push and pull request runs `flake8` and the suite on python 3.9 and 3.12, see `.github/workflows/ci.yml`.
 
 ### py3 / qt5 conversion leftovers
@@ -35,6 +42,16 @@ The 1.5.0 conversion left a few things behind that have since been fixed:
 * encoded headers (`=?utf-8?B?...?=`) are decoded, so non-ascii subjects and names are readable in the message list.
 * removing more than one account no longer takes out the wrong tabs in the main window, and an account with no name shows `user@host` instead of `None`.
 * if the desktop has no system tray, the main window is shown right away and closing it quits -- the app used to start up completely invisible, with no way out but `kill`.
+
+### message cache
+
+The headers of the messages already seen are kept in `~/.cache/poptrayminus/{host}_{md5(user)}.json.gz` (`$XDG_CACHE_HOME` is honoured), so a big mailbox is not pulled through POP3 all over again on every start -- only the UIDLs that are not in the cache get fetched. The cache is written after every scan, is per account, and is simply ignored (and refilled) when it is missing, unreadable or written by another version. Servers with no UIDL support get no cache, as message numbers are not stable enough to key anything on.
+
+Blacklist patterns are applied to the cached headers as well, so a pattern added in the settings still deletes mail that was already in the list -- those messages are never fetched again, and nothing else would look at them.
+
+Message bodies are cached too, but only lazily: the text of a message is kept the first time you preview it, so opening it again is instant and works with the server down. Scans still pull headers only (`TOP n 0`), as fetching every body up front would be exactly the bandwidth hog this is meant to avoid. The bodies are capped at `CACHE_BODIES` messages and `CACHE_BODY_BYTES` of text, dropping the least recently read ones.
+
+It is gzipped json rather than a pickle on purpose: `pickle.load()` would run whatever ends up in that file, and `zcat` on the cache still shows you what is in there.
 
 ### distribution
 I tried to distribute this by myself before, and that was quite a pain in the behind, though, poptrayminus has found its way into a few linux distributions (thank you, guys).
