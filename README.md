@@ -43,6 +43,12 @@ The 1.5.0 conversion left a few things behind that have since been fixed:
 * removing more than one account no longer takes out the wrong tabs in the main window, and an account with no name shows `user@host` instead of `None`.
 * if the desktop has no system tray, the main window is shown right away and closing it quits -- the app used to start up completely invisible, with no way out but `kill`.
 
+### settings
+
+Each account has a *Check this account* tick. Turning it off leaves the account alone -- no polling, no connection attempts -- while its tab stays where it is, still showing whatever was cached, with the name in brackets. Handy for an account whose server is down, or one you only want to look at now and then.
+
+*Test connection* logs in with whatever is currently in the fields (nothing has to be saved first) and reports the message count and mailbox size, or the error the server gave, with a 15 second timeout. The port field turns red as soon as it holds something that is not a port, instead of waiting for OK to be pressed.
+
 ### message cache
 
 The headers of the messages already seen are kept in `~/.cache/poptrayminus/{host}_{md5(user)}.json.gz` (`$XDG_CACHE_HOME` is honoured), so a big mailbox is not pulled through POP3 all over again on every start -- only the UIDLs that are not in the cache get fetched. The cache is written after every scan, is per account, and is simply ignored (and refilled) when it is missing, unreadable or written by another version. Servers with no UIDL support get no cache, as message numbers are not stable enough to key anything on.

@@ -59,6 +59,18 @@ def to_text( data ) :
 	# poplib hands back bytes, but the ui and the message maps work with str
 	return data.decode( 'utf-8', errors = 'replace' ) if isinstance( data, bytes ) else str(data)
 
+TEST_TIMEOUT = 15	# seconds to wait when the settings dialog tries a server
+
+def valid_port( port ) :
+	try :
+		return 1 <= int(port) <= 65535
+	except ValueError :
+		return False
+
+def is_enabled( value ) :
+	# QSettings gives back whatever the ini file holds, 'false' and '0' included
+	return str(value).lower() not in ( 'false', '0', 'no' )
+
 CACHE_VERSION = 1
 CACHE_BODIES = 200			# how many previewed messages to keep
 CACHE_BODY_BYTES = 20 * 1024 * 1024	# ...and how much text they may take up
@@ -273,6 +285,15 @@ class ConfigPage( QtWidgets.QWidget ) :
 			form_layout.setWidget( i, QtWidgets.QFormLayout.LabelRole, label )
 			label.setBuddy( buddy_list[i] )
 
+		self.enabled_check = QtWidgets.QCheckBox( '&Check this account', self )
+		self.enabled_check.setToolTip( 'when off, the account is left alone and its tab keeps the messages it already had' )
+		self.test_button = QtWidgets.QPushButton( 'Test c&onnection', self )
+
+		check_layout = QtWidgets.QHBoxLayout()
+		check_layout.addWidget( self.enabled_check )
+		check_layout.addStretch()
+		check_layout.addWidget( self.test_button )
+
 		# black lists
 		self.black_from = QtWidgets.QPlainTextEdit( self  )
 		black_from_layout = QtWidgets.QVBoxLayout()
@@ -287,6 +308,7 @@ class ConfigPage( QtWidgets.QWidget ) :
 		# page layout
 		layout = QtWidgets.QVBoxLayout( self )
 		layout.addLayout( form_layout )
+		layout.addLayout( check_layout )
 		layout.addLayout( black_from_layout )
 		layout.addLayout( black_to_layout )
 
@@ -323,6 +345,55 @@ class ConfigPage( QtWidgets.QWidget ) :
 		self.black_from.setToolTip( 'messages with matching substring in "From:" will be deleted' )
 		self.black_to.setToolTip( 'messages with matching substring in "To:" will be deleted' )
 
+		self.enabled_check.setChecked( is_enabled( config.value( 'enabled', 'true' ) ) )
+
+		self.port_edit.setValidator( QtGui.QIntValidator( 1, 65535, self ) )
+		self.port_edit.textChanged.connect( self.onPort )
+		self.onPort( self.port_edit.text() )		# a stored port may be bogus as well
+
+		self.test_button.clicked.connect( self.onTest )
+
+	def onPort( self, text ) :
+		# say so right away, instead of waiting for OK to be pressed
+		self.port_edit.setStyleSheet( '' if valid_port( text ) else 'background: #ffd0d0' )
+
+	def onTest( self ) :
+		QtWidgets.QApplication.setOverrideCursor( QtCore.Qt.WaitCursor )
+		try :
+			text = self.try_connection()
+			icon = QtWidgets.QMessageBox.information
+		except Exception as e :
+			text = str(e)
+			icon = QtWidgets.QMessageBox.warning
+		finally :
+			QtWidgets.QApplication.restoreOverrideCursor()
+
+		icon( self, 'PopTray Minus - Test connection', text )
+
+	def try_connection( self ) :
+		# the same conversation load_messages() starts with, without reading anything
+		host = str(self.server_edit.text())
+		user = str(self.user_edit.text())
+		if not valid_port( self.port_edit.text() ) :
+			raise Exception( 'port value should be a number between 1 and 65535' )
+		port = int(self.port_edit.text())
+
+		if str(self.mailbox_combo.currentText()) == 'POP3' :
+			mbox = poplib.POP3( host, port, timeout = TEST_TIMEOUT )
+		else :
+			mbox = poplib.POP3_SSL( host, port, timeout = TEST_TIMEOUT )
+		try :
+			mbox.user( user )
+			mbox.pass_( str(self.pass_edit.text()) )
+			( count, size ) = mbox.stat()
+		finally :
+			try :
+				mbox.quit()
+			except Exception:
+				pass	# the greeting or the login failed, nothing to close down politely
+
+		return 'Connected to %s as %s\n%d messages, %.1f kb' % ( host, user, count, size / 1024.0 )
+
 	def onMailbox( self, selection ) :
 		# print( 'activated: ', selection )
 		if selection == 1 :
@@ -348,10 +419,8 @@ class ConfigPage( QtWidgets.QWidget ) :
 		except Exception as e :
 			raise Exception( host + ' -- ' + str(e))
 
-		try :
-			port = int(port)
-		except ValueError:
-			raise Exception( "port value should be numeric")
+		if not valid_port( port ) :
+			raise Exception( "port value should be a number between 1 and 65535" )
 
 		self.extract_patterns( self.black_from, 'From' )	# raises if a pattern is too short
 		self.extract_patterns( self.black_to, 'To' )
@@ -376,6 +445,7 @@ class ConfigPage( QtWidgets.QWidget ) :
 		config.setValue( 'passwd', passwd )
 		config.setValue( 'interval', interval )
 		config.setValue( 'protocol', protocol )
+		config.setValue( 'enabled', 'true' if self.enabled_check.isChecked() else 'false' )
 
 		bf = self.extract_patterns( self.black_from, 'From' )
 		bt = self.extract_patterns( self. black_to, 'To' )
@@ -575,6 +645,9 @@ class MainForm( QtWidgets.QDialog ) :
 			else :
 				title = '%s@%s' % (user,host)
 
+			if not acc['enabled'] :
+				title = '(%s)' % title
+
 			try :
 				msg_num = len(self.mailboxen[i].messages)
 				if msg_num :
@@ -681,10 +754,11 @@ class MainForm( QtWidgets.QDialog ) :
 
 		for i,mb in enumerate(self.mailboxen) :
 			msg_num = len(mb.messages)
+			title = mb.title() if mb.account['enabled'] else '(%s)' % mb.title()
 			if msg_num :
-				self.tab_widget.setTabText(i, "%s - %d" % (mb.title(), msg_num))
+				self.tab_widget.setTabText(i, "%s - %d" % (title, msg_num))
 			else :
-				self.tab_widget.setTabText(i, mb.title())
+				self.tab_widget.setTabText(i, title)
 
 	def strip_err( self, err ) :
 		err = to_text( err )
@@ -704,7 +778,8 @@ class MainForm( QtWidgets.QDialog ) :
 		tray.trayIcon.setIcon( getIcon( 'mail-send-receive.png' ) )
 
 		try :
-			mb.rescan()
+			if mb.account['enabled'] :
+				mb.rescan()
 			err_msg = None
 		except poplib.error_proto as e :
 			if debug :
@@ -759,6 +834,8 @@ class MainForm( QtWidgets.QDialog ) :
 		self.setup_boxes()
 
 		for mb in self.mailboxen :
+			if not mb.account['enabled'] :
+				continue
 			mb.elapsed += 1
 			if mb.elapsed >= mb.account['interval'] :
 				self.reload( mb )
@@ -1554,6 +1631,7 @@ def load_settings() :
 				acc['pass'] = ''		# b64decode failed ?
 			acc['interval'] = int(config.value( 'interval', 15 ))
 			acc['protocol'] = str(config.value( 'protocol', 'POP3' ))
+			acc['enabled'] = is_enabled( config.value( 'enabled', 'true' ) )
 			acc['black_from_contains'] = loadConfigList( 'black_from_contains' )
 			acc['black_to_contains'] = loadConfigList( 'black_to_contains' )
 			settings.append( acc )

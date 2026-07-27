@@ -67,6 +67,7 @@ def make_account( **kwargs ) :
 		'pass': 'secret',
 		'interval': 15,
 		'protocol': 'POP3',
+		'enabled': True,
 		'black_from_contains': [],
 		'black_to_contains': [],
 	}
