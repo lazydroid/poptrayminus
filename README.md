@@ -47,6 +47,8 @@ The 1.5.0 conversion left a few things behind that have since been fixed:
 
 The headers of the messages already seen are kept in `~/.cache/poptrayminus/{host}_{md5(user)}.json.gz` (`$XDG_CACHE_HOME` is honoured), so a big mailbox is not pulled through POP3 all over again on every start -- only the UIDLs that are not in the cache get fetched. The cache is written after every scan, is per account, and is simply ignored (and refilled) when it is missing, unreadable or written by another version. Servers with no UIDL support get no cache, as message numbers are not stable enough to key anything on.
 
+Blacklist patterns are applied to the cached headers as well, so a pattern added in the settings still deletes mail that was already in the list -- those messages are never fetched again, and nothing else would look at them.
+
 Message bodies are cached too, but only lazily: the text of a message is kept the first time you preview it, so opening it again is instant and works with the server down. Scans still pull headers only (`TOP n 0`), as fetching every body up front would be exactly the bandwidth hog this is meant to avoid. The bodies are capped at `CACHE_BODIES` messages and `CACHE_BODY_BYTES` of text, dropping the least recently read ones.
 
 It is gzipped json rather than a pickle on purpose: `pickle.load()` would run whatever ends up in that file, and `zcat` on the cache still shows you what is in there.

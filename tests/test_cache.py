@@ -125,6 +125,35 @@ def test_blacklisted_messages_are_not_cached( ptm, monkeypatch, globals_stub ) :
 	assert again.topped == [] and sorted( reloaded.messages ) == ['UID0001']
 
 
+def test_new_blacklist_pattern_reaches_cached_messages( ptm, monkeypatch, globals_stub ) :
+	# the cached headers are never fetched again, so nothing else would re-examine them
+	messages = { 1: ('UID0001', make_message()), 2: ('UID0002', make_message( sender = 'spammer@example.net' )) }
+	first = mailbox( ptm, monkeypatch, counting_mbox( messages ) )
+	first.rescan()
+	first.get_message( 'UID0002' )
+	assert sorted( first.messages ) == ['UID0001', 'UID0002']
+
+	mbox = counting_mbox( messages )		# pattern added in the settings afterwards
+	second = mailbox( ptm, monkeypatch, mbox, black_from_contains = ['spammer@'] )
+	second.rescan()
+
+	assert mbox.deleted == [2]
+	assert sorted( second.messages ) == ['UID0001'] and second.bodies == {}
+	assert mbox.topped == []			# and it did not have to refetch anything
+
+
+def test_blacklist_leaves_the_innocent_alone( ptm, monkeypatch, globals_stub ) :
+	messages = { 1: ('UID0001', make_message( to = 'someone@example.org' )) }
+	first = mailbox( ptm, monkeypatch, counting_mbox( messages ) )
+	first.rescan()
+
+	mbox = counting_mbox( messages )
+	second = mailbox( ptm, monkeypatch, mbox, black_to_contains = ['nobody@'] )
+	second.rescan()
+
+	assert mbox.deleted == [] and sorted( second.messages ) == ['UID0001']
+
+
 def test_cached_messages_survive_an_unreachable_server( ptm, monkeypatch, globals_stub ) :
 	first = mailbox( ptm, monkeypatch, counting_mbox( { 1: ('UID0001', make_message()) } ) )
 	first.rescan()

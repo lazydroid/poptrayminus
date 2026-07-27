@@ -999,6 +999,24 @@ class Mailbox :
 #				msg_subj = '*****' + str(e)
 		return string
 
+	def filter_cached( self, mbox, uidl_to_num ) :
+		# a blacklist pattern added after the headers were cached still has to bite:
+		# those messages are never fetched again, so nothing would re-examine them
+		dropped = set()
+		for i in list( self.messages ) :
+			if i not in uidl_to_num :
+				continue
+			( msg_from, msg_to, msg_subj ) = ( self.messages[i][1], self.messages[i][2], self.messages[i][5] )
+			if not self.is_blacklisted( msg_from, msg_to, msg_subj ) :
+				continue
+			if debug :
+				print( '**DELETED** (cached)', msg_from, msg_subj )
+			mbox.dele( uidl_to_num[i] )
+			del self.messages[i]
+			self.bodies.pop( i, None )
+			dropped.add( i )
+		return dropped
+
 	def load_messages( self, mbox, nums ) :
 		self.new_mail = 0
 		for (k,i) in enumerate(nums) :
@@ -1151,10 +1169,12 @@ class Mailbox :
 #			print( num_to_uidl )
 #			print( uidl_to_num )
 
+			dropped = self.filter_cached( mbox, uidl_to_num )
+
 			old_messages = set( n for n in self.messages )
 #			print( old_messages )
 
-			new_messages = set( n for n in uidl_to_num )
+			new_messages = set( n for n in uidl_to_num ) - dropped	# just killed, do not read them back
 #			print( new_messages )
 
 			gone = old_messages - new_messages

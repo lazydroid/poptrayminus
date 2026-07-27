@@ -85,3 +85,17 @@ def test_blacklisted_message_is_deleted_on_load( ptm, server, globals_stub ) :
 	after = mailbox( ptm, server, black_from_contains = ['spam.example'] )
 	after.rescan()
 	assert 'UID0003' not in after.messages		# and it does not come back off the cache
+
+
+def test_blacklist_added_after_the_cache_still_bites( ptm, server, globals_stub ) :
+	plain = mailbox( ptm, server )
+	plain.rescan()
+	assert 'UID0003' in plain.messages
+	server.store.forget_commands()
+
+	later = mailbox( ptm, server, black_from_contains = ['spam.example'] )
+	later.rescan()
+
+	assert 'DELE 3' in server.store.commands()
+	assert topped( server ) == []			# decided on the cached header alone
+	assert 'UID0003' not in later.messages
