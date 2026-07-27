@@ -16,6 +16,13 @@ If you want to develop and package this yourself, you'll need to install `devscr
 
 There is a small pytest suite in `tests/`, covering the settings storage, the POP3 handling and the message filtering logic. Run it with `python3 -m pytest tests` (needs `pytest`, `PyQt5` and `chardet`); the GUI parts run headless via `QT_QPA_PLATFORM=offscreen`, which the tests set for you.
 
+`tests/dummy_pop3.py` is a small POP3 server with five placeholder messages (encoded headers and spam scores among them), used by the socket level tests and handy for poking at the app by hand:
+
+	python3 tests/dummy_pop3.py --port 1110 --state /tmp/dummy   # then point an account at 127.0.0.1:1110
+	python3 tests/dummy_pop3.py --state /tmp/dummy --extra       # deliver one more message
+
+Deletions live in the state directory and survive a restart, and every command the server sees is appended to `{state}/log`, which is how the tests tell a cached message from a refetched one.
+
 Every push and pull request runs `flake8` and the suite on python 3.9 and 3.12, see `.github/workflows/ci.yml`.
 
 ### py3 / qt5 conversion leftovers
