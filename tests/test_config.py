@@ -35,6 +35,7 @@ def test_load_settings_reads_account( ptm, config ) :
 		'pass': 'secret',
 		'interval': 30,
 		'protocol': 'POP3 SSL',
+		'enabled': True,
 		'black_from_contains': ['spammer'],
 		'black_to_contains': [],
 	}]

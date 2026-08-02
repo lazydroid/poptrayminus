@@ -34,6 +34,12 @@ class FakePOP3 :
 	def dele( self, num ) :
 		self.deleted.append( int(num) )
 
+	def user( self, name ) :
+		pass
+
+	def pass_( self, passwd ) :
+		pass
+
 	def stat( self ) :
 		return ( len(self.messages), 1024 )
 
