@@ -78,7 +78,7 @@ def test_get_message_returns_text( ptm, mbox, monkeypatch ) :
 
 	text = mb.get_message( 'UID0002' )
 
-	assert 'Subject: hi' in text
+	assert 'Subject:</b> hi' in text
 	assert 'hello there' in text
 
 

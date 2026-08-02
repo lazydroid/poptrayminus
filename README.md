@@ -43,6 +43,12 @@ The 1.5.0 conversion left a few things behind that have since been fixed:
 * removing more than one account no longer takes out the wrong tabs in the main window, and an account with no name shows `user@host` instead of `None`.
 * if the desktop has no system tray, the main window is shown right away and closing it quits -- the app used to start up completely invisible, with no way out but `kill`.
 
+### preview
+
+The preview shows the message rather than its source: rfc2047 headers on top, then the body with its transfer encoding undone (base64, quoted-printable) and decoded from whatever charset it declares -- or, if it declares nothing usable, from the one `chardet` guesses. Multipart mail shows its `text/plain` part, falling back to `text/html` when that is all there is; attachments are listed by name instead of being dumped as base64. Plain bodies are escaped before being handed to the browser, so a message full of `<script>` is text, not markup.
+
+Only `PREVIEW_LINES` (200) lines are asked of the server, so a huge message is still cheap to look at, and it is the raw source that goes into the cache -- improving the rendering does not mean refetching anything.
+
 ### settings
 
 Each account has a *Check this account* tick. Turning it off leaves the account alone -- no polling, no connection attempts -- while its tab stays where it is, reading the message list straight off the cache, with the name in brackets. Handy for an account whose server is down, or one you only want to look at now and then.
