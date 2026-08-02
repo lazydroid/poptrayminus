@@ -124,6 +124,28 @@ def test_disabled_account_keeps_its_messages_and_says_so( ptm, qapp, config, mon
 	assert form.tables[0].topLevelItemCount() == 1
 
 
+def test_disabled_account_shows_its_cached_messages( ptm, qapp, config, monkeypatch, server ) :
+	# nothing else loads the cache, so skipping rescan() used to leave an empty table
+	save_account( ptm, qapp, config, port = server.server_address[1] )
+
+	form = ptm.MainForm()
+	monkeypatch.setattr( ptm, 'tray', ptm.nullTray(), raising = False )
+	monkeypatch.setattr( ptm, 'form', form, raising = False )
+	form.reload( form.mailboxen[0] )
+	assert form.tables[0].topLevelItemCount() == 5
+
+	save_account( ptm, qapp, config, port = server.server_address[1], enabled = False )
+	later = ptm.MainForm()			# a fresh start, with the account already off
+	monkeypatch.setattr( ptm, 'form', later, raising = False )
+	server.store.forget_commands()
+
+	later.reload( later.mailboxen[0] )
+
+	assert server.store.commands() == []	# straight off the disk, nothing asked of the server
+	assert later.tables[0].topLevelItemCount() == 5
+	assert later.tab_widget.tabText( 0 ).startswith( '(' )
+
+
 def test_auto_reload_skips_disabled_accounts( ptm, qapp, config, monkeypatch ) :
 	save_account( ptm, qapp, config )
 
@@ -164,20 +186,18 @@ def test_connection_test_reports_a_refusal( ptm, qapp, config, server ) :
 		pp.try_connection()
 
 
-def test_connection_test_reports_a_login_failure( ptm, qapp, config, monkeypatch ) :
-	pp = page( ptm, qapp, config )
+def test_connection_test_reports_a_login_failure( ptm, qapp, config, tmp_path ) :
+	srv = serve( str(tmp_path / 'strict'), password = 'letmein' )
+	pp = page( ptm, qapp, config, port = srv.server_address[1], passwd = 'wrong' )
 
-	class Rejecting( FakePOP3 ) :
-		def user( self, name ) :
-			pass
+	try :
+		with pytest.raises( poplib.error_proto ) as caught :
+			pp.try_connection()
+	finally :
+		srv.shutdown()
 
-		def pass_( self, passwd ) :
-			raise poplib.error_proto( b'-ERR authentication failed' )
-
-	monkeypatch.setattr( ptm.poplib, 'POP3', lambda host, port, timeout : Rejecting( {} ) )
-
-	with pytest.raises( poplib.error_proto ) :
-		pp.try_connection()
+	# the server's own words, rather than the b'-ERR ...' repr poplib carries around
+	assert ptm.strip_err( caught.value.args[0] ) == '[AUTH] invalid password for this account'
 
 
 def test_connection_test_refuses_a_bad_port( ptm, qapp, config ) :

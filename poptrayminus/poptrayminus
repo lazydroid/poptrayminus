@@ -67,6 +67,13 @@ def valid_port( port ) :
 	except ValueError :
 		return False
 
+def strip_err( err ) :
+	# poplib puts the raw server reply in the exception, bytes and '-ERR ' and all
+	err = to_text( err )
+	if err.startswith( '-ERR ' ) :
+		return err[5:]
+	return err
+
 def is_enabled( value ) :
 	# QSettings gives back whatever the ini file holds, 'false' and '0' included
 	return str(value).lower() not in ( 'false', '0', 'no' )
@@ -362,6 +369,9 @@ class ConfigPage( QtWidgets.QWidget ) :
 		try :
 			text = self.try_connection()
 			icon = QtWidgets.QMessageBox.information
+		except poplib.error_proto as e :
+			text = strip_err( e.args[0] )	# the server's own words, not a bytes repr
+			icon = QtWidgets.QMessageBox.warning
 		except Exception as e :
 			text = str(e)
 			icon = QtWidgets.QMessageBox.warning
@@ -761,10 +771,7 @@ class MainForm( QtWidgets.QDialog ) :
 				self.tab_widget.setTabText(i, title)
 
 	def strip_err( self, err ) :
-		err = to_text( err )
-		if err.startswith( '-ERR ' ) :
-			return err[5:]
-		return err
+		return strip_err( err )
 
 	def reload( self, mb = None ) :
 		for i in ( self.reload_button, self.preview_button, self.delete_button ) :
@@ -780,6 +787,8 @@ class MainForm( QtWidgets.QDialog ) :
 		try :
 			if mb.account['enabled'] :
 				mb.rescan()
+			elif not mb.cache_loaded :
+				mb.load_cache()		# rescan() is what usually does this, and it is skipped
 			err_msg = None
 		except poplib.error_proto as e :
 			if debug :

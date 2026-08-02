@@ -45,7 +45,7 @@ The 1.5.0 conversion left a few things behind that have since been fixed:
 
 ### settings
 
-Each account has a *Check this account* tick. Turning it off leaves the account alone -- no polling, no connection attempts -- while its tab stays where it is, still showing whatever was cached, with the name in brackets. Handy for an account whose server is down, or one you only want to look at now and then.
+Each account has a *Check this account* tick. Turning it off leaves the account alone -- no polling, no connection attempts -- while its tab stays where it is, reading the message list straight off the cache, with the name in brackets. Handy for an account whose server is down, or one you only want to look at now and then.
 
 *Test connection* logs in with whatever is currently in the fields (nothing has to be saved first) and reports the message count and mailbox size, or the error the server gave, with a 15 second timeout. The port field turns red as soon as it holds something that is not a port, instead of waiting for OK to be pressed.
 
