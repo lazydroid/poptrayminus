@@ -49,14 +49,14 @@ def test_preview_is_fetched_once( ptm, server, globals_stub ) :
 	server.store.forget_commands()
 
 	assert 'quarterly report' in mb.get_message( 'UID0001' )
-	assert topped( server ) == ['TOP 1 100']
+	assert topped( server ) == ['TOP 1 200']
 
 	assert 'quarterly report' in mb.get_message( 'UID0001' )
-	assert topped( server ) == ['TOP 1 100']		# second read never left the process
+	assert topped( server ) == ['TOP 1 200']		# second read never left the process
 
 	again = mailbox( ptm, server )				# and not after a restart either
 	assert 'quarterly report' in again.get_message( 'UID0001' )
-	assert topped( server ) == ['TOP 1 100']
+	assert topped( server ) == ['TOP 1 200']
 
 
 def test_deleted_message_is_gone_after_a_restart( ptm, server, globals_stub ) :

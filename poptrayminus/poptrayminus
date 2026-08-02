@@ -28,6 +28,7 @@
 import poplib,  email, email.header, base64, json, traceback
 import os, sys, datetime, socket, chardet, time
 import gzip, hashlib, re
+from html import escape as html_escape
 
 try :	# fix around 'line too long' issue https://bugs.python.org/issue16041
 	if poplib._MAXLINE == 2048 :
@@ -58,6 +59,91 @@ debug = False
 def to_text( data ) :
 	# poplib hands back bytes, but the ui and the message maps work with str
 	return data.decode( 'utf-8', errors = 'replace' ) if isinstance( data, bytes ) else str(data)
+
+PREVIEW_LINES = 200	# how much of a message body the preview asks the server for
+
+def decode_stuff( stuff ) :
+	# headers arrive rfc2047-encoded, as '=?utf-8?B?....?=' words
+	if stuff is None :
+		return ''
+	lines = list()
+	try :
+		parts = email.header.decode_header( to_text( stuff ) )
+	except Exception:
+		return to_text( stuff )	# malformed header, keep it as is
+	for ( data, encoding ) in parts :
+		if isinstance( data, bytes ) :
+			try :
+				data = data.decode( encoding or 'utf-8', errors = 'replace' )
+			except LookupError :
+				data = data.decode( 'utf-8', errors = 'replace' )	# bogus charset
+		lines.append( data )
+	return ''.join( lines )
+
+def decode_part( part ) :
+	# base64 / quoted-printable and whatever charset the part claims to be in
+	try :
+		data = part.get_payload( decode = True )
+	except Exception:
+		data = None
+	if data is None :			# not a leaf, or an undecodable payload
+		return to_text( part.get_payload() )
+
+	charset = part.get_content_charset()
+	if charset :
+		try :
+			return data.decode( charset, errors = 'replace' )
+		except LookupError :
+			pass			# the charset is made up, guess like everywhere else
+	found = chardet.detect( data )
+	return data.decode( found['encoding'] or 'utf-8', errors = 'replace' )
+
+def pick_part( msg ) :
+	# text/plain if there is one, the html alternative otherwise
+	( plain, html ) = ( None, None )
+	for part in msg.walk() :
+		if part.is_multipart() :
+			continue
+		if 'attachment' in str( part.get( 'Content-Disposition', '' ) ).lower() :
+			continue
+		if part.get_content_type() == 'text/plain' and plain is None :
+			plain = part
+		elif part.get_content_type() == 'text/html' and html is None :
+			html = part
+	return plain or html or msg
+
+def attachment_names( msg ) :
+	names = list()
+	for part in msg.walk() :
+		if part.is_multipart() :
+			continue
+		name = part.get_filename()
+		if name or 'attachment' in str( part.get( 'Content-Disposition', '' ) ).lower() :
+			names.append( decode_stuff( name ) or part.get_content_type() )
+	return names
+
+def render_message( raw ) :
+	# the preview used to be the raw source, base64 blobs and mime boundaries included
+	try :
+		msg = email.message_from_string( raw )
+	except Exception :
+		return '<pre>%s</pre>' % html_escape( raw )
+
+	head = ''
+	for name in ( 'From', 'To', 'Cc', 'Date', 'Subject' ) :
+		if msg[ name ] :
+			head += '<b>%s:</b> %s<br>' % ( name, html_escape( decode_stuff( msg[name] ) ) )
+
+	files = attachment_names( msg )
+	if files :
+		head += '<b>Attachments:</b> %s<br>' % html_escape( ', '.join( files ) )
+
+	part = pick_part( msg )
+	body = decode_part( part )
+	if part.get_content_type() != 'text/html' :
+		body = '<pre>%s</pre>' % html_escape( body )
+
+	return head + '<hr>' + body
 
 CACHE_VERSION = 1
 CACHE_BODIES = 200			# how many previewed messages to keep
@@ -941,22 +1027,7 @@ class Mailbox :
 		return '%s@%s' % (self.account['user'], self.account['host'])
 
 	def decode_stuff( self, stuff ) :
-		# headers arrive rfc2047-encoded, as '=?utf-8?B?....?=' words
-		if stuff is None :
-			return ''
-		lines = list()
-		try :
-			parts = email.header.decode_header( to_text( stuff ) )
-		except Exception:
-			return to_text( stuff )	# malformed header, keep it as is
-		for ( data, encoding ) in parts :
-			if isinstance( data, bytes ) :
-				try :
-					data = data.decode( encoding or 'utf-8', errors = 'replace' )
-				except LookupError :
-					data = data.decode( 'utf-8', errors = 'replace' )	# bogus charset
-			lines.append( data )
-		return ''.join( lines )
+		return decode_stuff( stuff )
 
 	def check_error( self, data ) :
 		if not to_text( data[0] ).startswith( '+OK' ) :
@@ -1125,7 +1196,8 @@ class Mailbox :
 		if not self.cache_loaded :
 			self.load_cache()
 		if msg_id in self.bodies :
-			return self.bodies[ msg_id ]	# already read once, the server has nothing new to say
+			# already read once, the server has nothing new to say
+			return render_message( self.bodies[ msg_id ] )
 
 		keep = False
 		mbox = self.open_mbox()
@@ -1135,7 +1207,7 @@ class Mailbox :
 			num_to_uidl = dict( (int(n),num_to_uidl[n]) for n in num_to_uidl )
 			uidl_to_num = dict( (num_to_uidl[n],n) for n in num_to_uidl )
 
-			data = mbox.top( uidl_to_num[msg_id], 100 )
+			data = mbox.top( uidl_to_num[msg_id], PREVIEW_LINES )
 			if to_text( data[0] ).startswith( '+OK' ) :
 				text = '\n'.join( to_text( line ) for line in data[1] )
 				keep = True		# only a real message is worth keeping, not an error
@@ -1145,9 +1217,12 @@ class Mailbox :
 			text = 'no such message'
 		mbox.quit()
 
-		if keep :
-			self.remember_body( msg_id, text )
-		return text
+		if not keep :
+			return text		# an error line, there is no message to make sense of
+
+		# the raw source is what gets cached, so a better renderer needs no refetch
+		self.remember_body( msg_id, text )
+		return render_message( text )
 
 	def rescan( self ) :
 		app.processEvents()		# just in case

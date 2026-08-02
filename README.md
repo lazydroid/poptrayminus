@@ -43,6 +43,12 @@ The 1.5.0 conversion left a few things behind that have since been fixed:
 * removing more than one account no longer takes out the wrong tabs in the main window, and an account with no name shows `user@host` instead of `None`.
 * if the desktop has no system tray, the main window is shown right away and closing it quits -- the app used to start up completely invisible, with no way out but `kill`.
 
+### preview
+
+The preview shows the message rather than its source: rfc2047 headers on top, then the body with its transfer encoding undone (base64, quoted-printable) and decoded from whatever charset it declares -- or, if it declares nothing usable, from the one `chardet` guesses. Multipart mail shows its `text/plain` part, falling back to `text/html` when that is all there is; attachments are listed by name instead of being dumped as base64. Plain bodies are escaped before being handed to the browser, so a message full of `<script>` is text, not markup.
+
+Only `PREVIEW_LINES` (200) lines are asked of the server, so a huge message is still cheap to look at, and it is the raw source that goes into the cache -- improving the rendering does not mean refetching anything.
+
 ### message cache
 
 The headers of the messages already seen are kept in `~/.cache/poptrayminus/{host}_{md5(user)}.json.gz` (`$XDG_CACHE_HOME` is honoured), so a big mailbox is not pulled through POP3 all over again on every start -- only the UIDLs that are not in the cache get fetched. The cache is written after every scan, is per account, and is simply ignored (and refilled) when it is missing, unreadable or written by another version. Servers with no UIDL support get no cache, as message numbers are not stable enough to key anything on.
