@@ -160,6 +160,10 @@ def strip_err( err ) :
 		return err[5:]
 	return err
 
+def account_count() :
+	# the config holds a 'layout' group as well, counting all of them would be wrong
+	return len( [ i for i in config.childGroups() if i.startswith( 'account' ) ] )
+
 def is_enabled( value ) :
 	# QSettings gives back whatever the ini file holds, 'false' and '0' included
 	return str(value).lower() not in ( 'false', '0', 'no' )
@@ -228,16 +232,13 @@ class sysTray(QtWidgets.QWidget):
 		self.trayIcon.setIcon( getIcon( 'mail.png' ) )
 		# QtCore.QObject.trayIcon.activated(QtWidgets.QSystemTrayIcon.ActivationReason).connect( self.onActivation )
 		self.trayIcon.activated.connect( self.onActivation )
-		# QtCore.QObject.connect( self.trayIcon, QtCore.SIGNAL('messageClicked()'), self.onMessageClicked )
+		self.trayIcon.messageClicked.connect( self.onMessageClicked )
 
 	def onActivation(self, reason) :
 		# print( 'onActivation' )
 		if reason != QtWidgets.QSystemTrayIcon.Context :
 			if form.isHidden() :
-				form.refresh()
-				form.showNormal()	# form.show() ?
-				form.activateWindow()
-				form.raise_()
+				form.show_tab()
 			else :
 				form.hide()
 
@@ -245,8 +246,9 @@ class sysTray(QtWidgets.QWidget):
 		# print( 'config!' )
 		ConfigForm(self).show()
 
-	# def onMessageClicked(self) :
-	# 	print( 'clicked!!' )
+	def onMessageClicked(self) :
+		# the notification says which mailbox it is about, so land on that tab
+		form.show_tab( form.notified_tab )
 
 	def setToolTip( self, tip ) :
 		self.trayIcon.setToolTip( tip )
@@ -582,7 +584,7 @@ class ConfigForm( QtWidgets.QDialog ) :
 		self.tab_widget = QtWidgets.QTabWidget()
 		self.pages = list()
 
-		for i in range( len(config.childGroups()) ) :
+		for i in range( account_count() ) :
 			config.beginGroup( 'account%d' % i )
 			if config.contains( 'host' ) or not i :
 				page = ConfigPage()
@@ -634,7 +636,7 @@ class ConfigForm( QtWidgets.QDialog ) :
 			config.endGroup()
 
 		# deal with leftover account data in config
-		for i in range(count,len(config.childGroups())) :
+		for i in range( count, account_count() ) :
 			config.beginGroup( 'account%d' % i )
 			config.remove('')	# clean up everything
 			config.endGroup()
@@ -657,10 +659,12 @@ class MainForm( QtWidgets.QDialog ) :
 		super( MainForm, self ).__init__( parent )
 
 		self.quit_on_close = False	# set when there is no tray icon to restore us from
+		self.notified_tab = 0		# the mailbox the last notification was about
 		self.tables = list()
 		self.mailboxen = list()
 		self.tab_widget = QtWidgets.QTabWidget()
 
+		self.load_layout()		# setup_tabs() builds the tables, so read it first
 		self.setup_tabs()
 		self.setup_boxes()
 
@@ -699,6 +703,9 @@ class MainForm( QtWidgets.QDialog ) :
 		self.resize( width, height )
 #		print( width, height )
 
+		if self.saved_geometry :
+			self.restoreGeometry( self.saved_geometry )
+
 		self.onSelectionChange()
 
 		self.timer = QtCore.QTimer()
@@ -706,6 +713,44 @@ class MainForm( QtWidgets.QDialog ) :
 		self.timer.setInterval( 1000 )	# 1 sec
 		self.timer.setSingleShot( True )
 		self.timer.start()
+
+	def load_layout( self ) :
+		# window size and the way the list is laid out, from the last run
+		config.beginGroup( 'layout' )
+		self.saved_geometry = config.value( 'geometry' )
+		columns = config.value( 'columns' ) or []
+		if isinstance( columns, str ) :
+			columns = [ columns ]		# QSettings unwraps a one item list
+		try :
+			self.columns = [ int(i) for i in columns ]
+		except ValueError :
+			self.columns = []		# hand edited into nonsense, use the defaults
+		self.sort_column = int( config.value( 'sort_column', 3 ) )
+		self.sort_order = QtCore.Qt.AscendingOrder if config.value( 'sort_order', 'desc' ) == 'asc' \
+			else QtCore.Qt.DescendingOrder
+		config.endGroup()
+
+	def save_layout( self ) :
+		config.beginGroup( 'layout' )
+		config.setValue( 'geometry', self.saveGeometry() )
+		if self.tables :
+			# every tab has the same columns, so whichever one is in front speaks for all
+			table = self.tables[ max( self.tab_widget.currentIndex(), 0 ) ]
+			header = table.header()
+			config.setValue( 'columns',
+				[ str(table.columnWidth(i)) for i in range( table.columnCount() ) ] )
+			config.setValue( 'sort_column', str( header.sortIndicatorSection() ) )
+			config.setValue( 'sort_order',
+				'asc' if header.sortIndicatorOrder() == QtCore.Qt.AscendingOrder else 'desc' )
+		config.endGroup()
+
+	def show_tab( self, index = None ) :
+		if index is not None and 0 <= index < self.tab_widget.count() :
+			self.tab_widget.setCurrentIndex( index )
+		self.refresh()
+		self.showNormal()
+		self.activateWindow()
+		self.raise_()
 
 	def tabChanged( self ) :
 		# print( 'changed' )
@@ -774,11 +819,15 @@ class MainForm( QtWidgets.QDialog ) :
 				self.table.resizeColumnToContents( 4 )
 				self.table.clear()
 
-				self.table.setColumnWidth( 1, self.size().width()//4 )
-				self.table.setColumnWidth( 2, self.size().width()//4 )
+				if self.columns :
+					for i, width in enumerate( self.columns[ : self.table.columnCount() ] ) :
+						self.table.setColumnWidth( i, width )
+				else :
+					self.table.setColumnWidth( 1, self.size().width()//4 )
+					self.table.setColumnWidth( 2, self.size().width()//4 )
 				self.table.setAlternatingRowColors(True)
 				self.table.setSelectionMode( QtWidgets.QTreeWidget.ExtendedSelection )
-				self.table.sortByColumn(3, QtCore.Qt.DescendingOrder)
+				self.table.sortByColumn( self.sort_column, self.sort_order )
 				self.table.setSortingEnabled(True)
 
 		while len(self.tables) > len(settings) :
@@ -787,6 +836,7 @@ class MainForm( QtWidgets.QDialog ) :
 
 	def closeEvent( self, event ) :
 		# print( 'use menu quit()' )
+		self.save_layout()
 		if self.quit_on_close :
 			event.accept()
 			return
@@ -804,6 +854,7 @@ class MainForm( QtWidgets.QDialog ) :
 			self.close()
 		else :
 			event.ignore()
+			self.save_layout()
 			self.hide()
 
 	def create_icon( self, name, number ) :
@@ -892,6 +943,7 @@ class MainForm( QtWidgets.QDialog ) :
 			err_msg = traceback.format_exc()
 
 		if err_msg :
+			self.notified_tab = self.mailboxen.index( mb )
 			log_this( err_msg, 2 )
 			tray.setToolTip( err_msg )
 			tray.trayIcon.showMessage( 'POP3 error', err_msg )
@@ -899,6 +951,7 @@ class MainForm( QtWidgets.QDialog ) :
 		else :
 			if mb.new_mail :	# new mail has arrived?
 				# tray.trayIcon.setIcon( self.create_icon('mail-mark-unread.png', len( mailbox.messages ) ) )
+				self.notified_tab = self.mailboxen.index( mb )	# where a click on it should land
 				tray.trayIcon.showMessage( 'New mail', "%d new messages\n%s" % (mb.new_mail, mb.title()) )
 			# else :
 				# tray.trayIcon.setIcon( self.create_icon('mail.png', len( mailbox.messages ) ) )
@@ -1697,7 +1750,7 @@ def fixConfig() :
 def load_settings() :
 	global settings
 	settings = list()
-	for i in range( len(config.childGroups()) ) :
+	for i in range( account_count() ) :
 		config.beginGroup( 'account%d' % i )
 		if config.contains( 'host' ) :
 			acc = {}
@@ -1746,6 +1799,7 @@ if __name__ == '__main__':
 		print( 'Settings: %s' % json.dumps( hide_passwords( settings ), indent='\t') )
 
 	form = MainForm()
+	app.aboutToQuit.connect( form.save_layout )	# quitting from the tray never closes the window
 
 	if QtWidgets.QSystemTrayIcon.isSystemTrayAvailable() :
 		tray = sysTray()
