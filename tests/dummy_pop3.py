@@ -47,8 +47,9 @@ SIXTH = make_message( 'carol@example.com', 'tester@example.com', 'Brand new mess
 class Mailstore :
 	# the messages and the deletions, kept in a directory so a restart sees them again
 
-	def __init__( self, state ) :
+	def __init__( self, state, password = None ) :
 		self.state = state
+		self.password = password	# None accepts anything, most test cases do not care
 		os.makedirs( state, exist_ok = True )
 
 	def path( self, name ) :
@@ -120,8 +121,13 @@ class Handler( socketserver.StreamRequestHandler ) :
 			dead = store.deleted()
 			live = [ i for i in range( 1, len(messages) + 1 ) if i not in dead ]
 
-			if cmd in ( 'USER', 'PASS' ) :
+			if cmd == 'USER' :
 				self.send( '+OK ok' )
+			elif cmd == 'PASS' :
+				if store.password is None or args[:1] == [ store.password ] :
+					self.send( '+OK ok' )
+				else :
+					self.send( '-ERR [AUTH] invalid password for this account' )
 			elif cmd == 'CAPA' :
 				self.send( '-ERR unsupported' )
 			elif cmd == 'STAT' :
@@ -178,9 +184,9 @@ class Server( socketserver.ThreadingTCPServer ) :
 		self.store = store
 
 
-def serve( state, port = 0 ) :
+def serve( state, port = 0, password = None ) :
 	# port 0 picks a free one, which is what the tests want
-	server = Server( ('127.0.0.1', port), Mailstore( state ) )
+	server = Server( ('127.0.0.1', port), Mailstore( state, password ) )
 	threading.Thread( target = server.serve_forever, daemon = True ).start()
 	return server
 
@@ -191,9 +197,10 @@ def main() :
 	parser.add_argument( '--state', default = '/tmp/dummy_pop3',
 		help = 'directory holding the log, the deletions and the "extra" flag file' )
 	parser.add_argument( '--extra', action = 'store_true', help = 'deliver the sixth message and exit' )
+	parser.add_argument( '--password', help = 'reject any other password, for testing login failures' )
 	args = parser.parse_args()
 
-	store = Mailstore( args.state )
+	store = Mailstore( args.state, args.password )
 	if args.extra :
 		store.deliver_extra()
 		return
