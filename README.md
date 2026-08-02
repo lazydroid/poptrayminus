@@ -55,6 +55,12 @@ Each account has a *Check this account* tick. Turning it off leaves the account 
 
 *Test connection* logs in with whatever is currently in the fields (nothing has to be saved first) and reports the message count and mailbox size, or the error the server gave, with a 15 second timeout. The port field turns red as soon as it holds something that is not a port, instead of waiting for OK to be pressed.
 
+### the main window
+
+The window size and position, the column widths and the column the list is sorted by are kept in the `layout` group of `~/.poptrayrc` and restored on the next start -- resizing the *Subject* column used to last until the app was closed. They are written when the window is closed or hidden, and when the app quits from the tray menu.
+
+Clicking a *New mail* notification brings the window up on the tab that got the mail (an error notification lands on the account that failed), instead of doing nothing at all.
+
 ### message cache
 
 The headers of the messages already seen are kept in `~/.cache/poptrayminus/{host}_{md5(user)}.json.gz` (`$XDG_CACHE_HOME` is honoured), so a big mailbox is not pulled through POP3 all over again on every start -- only the UIDLs that are not in the cache get fetched. The cache is written after every scan, is per account, and is simply ignored (and refilled) when it is missing, unreadable or written by another version. Servers with no UIDL support get no cache, as message numbers are not stable enough to key anything on.
