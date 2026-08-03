@@ -27,7 +27,7 @@
 
 import poplib,  email, email.header, base64, json, traceback
 import os, sys, datetime, socket, chardet, time
-import gzip, hashlib, re
+import gzip, hashlib, re, stat
 from html import escape as html_escape
 
 try :	# fix around 'line too long' issue https://bugs.python.org/issue16041
@@ -159,6 +159,17 @@ def strip_err( err ) :
 	if err.startswith( '-ERR ' ) :
 		return err[5:]
 	return err
+
+def protect_config() :
+	# the file holds the password, and base64 is not a secret keeper
+	try :
+		path = config.fileName()
+		mode = stat.S_IMODE( os.stat( path ).st_mode )
+		private = mode & ~( stat.S_IRWXG | stat.S_IRWXO )
+		if mode != private :
+			os.chmod( path, private )
+	except OSError as e :
+		log_this( 'cannot chmod the config: %s' % e, 1 )
 
 def is_enabled( value ) :
 	# QSettings gives back whatever the ini file holds, 'false' and '0' included
@@ -640,6 +651,7 @@ class ConfigForm( QtWidgets.QDialog ) :
 			config.endGroup()
 
 		config.sync()
+		protect_config()	# the file has just been (re)written, possibly for the first time
 
 		try :
 			form.timer.setInterval( 1000 )	# 1 sec to form.reload
@@ -1735,6 +1747,7 @@ if __name__ == '__main__':
 	#config = QtCore.QSettings( 'PopTray', 'poptray' )
 	config = QtCore.QSettings( os.path.expanduser("~") + '/.poptrayrc', QtCore.QSettings.NativeFormat )
 
+	protect_config()	# an old config was written world readable, with the password in it
 	fixConfig()	# convert old configs and remove old settings
 
 	if not len(config.allKeys()) :
@@ -1742,6 +1755,8 @@ if __name__ == '__main__':
 			sys.exit()
 
 	load_settings()
+	config.sync()		# load_settings() rewrites a legacy plaintext password
+	protect_config()
 	if debug :
 		print( 'Settings: %s' % json.dumps( hide_passwords( settings ), indent='\t') )
 

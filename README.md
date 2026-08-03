@@ -55,6 +55,10 @@ Each account has a *Check this account* tick. Turning it off leaves the account 
 
 *Test connection* logs in with whatever is currently in the fields (nothing has to be saved first) and reports the message count and mailbox size, or the error the server gave, with a 15 second timeout. The port field turns red as soon as it holds something that is not a port, instead of waiting for OK to be pressed.
 
+### the config file
+
+`~/.poptrayrc` holds the password, base64 encoded -- which hides it from a casual look and from nobody else -- so the file is chmodded to `600` when it is written and when the app starts, existing configs included. Only the group and other bits are cleared; if you keep it read only, it stays read only.
+
 ### message cache
 
 The headers of the messages already seen are kept in `~/.cache/poptrayminus/{host}_{md5(user)}.json.gz` (`$XDG_CACHE_HOME` is honoured), so a big mailbox is not pulled through POP3 all over again on every start -- only the UIDLs that are not in the cache get fetched. The cache is written after every scan, is per account, and is simply ignored (and refilled) when it is missing, unreadable or written by another version. Servers with no UIDL support get no cache, as message numbers are not stable enough to key anything on.
